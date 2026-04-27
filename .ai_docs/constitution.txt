@@ -1,0 +1,51 @@
+Stable principles, invariants, and architectural constraints that must not change without a significant redesign of the system.
+------------------------
+$speckit-constitution
+
+Principles
+
+Technology Constraints
+The system must run on Android versions supported by Karoo devices.
+The system must integrate with the Karoo Extension SDK.
+
+Dependencies
+The system should prefer well-established external libraries over custom implementations
+when they provide reliable and maintainable solutions.
+
+Code Quality
+All code must be clear, readable, and maintainable.
+Complex logic must be encapsulated in well-defined components.
+Magic values and implicit behavior must be avoided.
+
+Consistency
+The system must maintain consistent behavior across all features.
+State transitions must be explicit and predictable.
+
+Testing
+Core business logic must be testable in isolation.
+Critical logic such as mileage calculation must be covered by unit tests.
+Edge cases must be explicitly tested (e.g., duplicate updates, decreasing distance).
+
+Data Integrity
+The system must ensure data consistency at all times.
+Operations must be safe against duplication and partial updates.
+All state changes must be deterministic.
+
+Performance
+The system must avoid unnecessary writes and heavy operations.
+Distance updates must be processed efficiently and without excessive resource usage.
+
+Persistence
+Data persistence must be reliable and resilient to device restarts.
+Writes must not corrupt existing data.
+
+Error Handling
+The system must handle invalid or inconsistent input safely.
+Unexpected data (e.g., decreasing distance) must not break the system.
+
+Simplicity
+The system should favor simple and predictable solutions over complex abstractions.
+Unnecessary layers and premature optimizations must be avoided.
+
+Separation of Concerns
+Business logic, persistence, and external integrations must be clearly separated.

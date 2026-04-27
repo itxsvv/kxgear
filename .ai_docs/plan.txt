@@ -1,0 +1,56 @@
+command to provide your tech stack and architecture choices.
+------------------------
+$speckit-plan
+
+Project Structure
+Use the official Karoo Extension template as the project base:
+https://github.com/hammerheadnav/karoo-ext-template
+
+The application must be implemented as a Karoo Extension and follow the structure defined in this template.
+
+Application Identity
+The Karoo Extension application ID must be "kxgear".
+All extension initialization must use this ID when constructing KarooExtension.
+
+External Dependencies
+Use the Karoo Extension SDK for bike and ride data:
+https://github.com/hammerheadnav/karoo-ext
+
+Only this SDK must be used.
+Do not use deprecated or archived Karoo SDK repositories.
+
+Storage
+Use JSON files as the primary data storage format.
+Do not use any SQL-based storage solutions, including Room.
+Store data using a one-bike-per-file approach: each bike must be stored in a separate JSON file.
+Each JSON file must contain all local app data related to a single bike, including its parts and their state.
+
+Bike Source of Truth
+Do not implement manual bike creation, deletion, or editing.
+Load bikes from the Karoo SDK on application startup.
+If the Karoo SDK returns a bike that does not yet exist locally, create a corresponding local bike record automatically.
+Use Karoo-provided bike data as the source of truth for bike existence and bike mileage.
+Preserve existing local part data when matching a local bike to a bike returned by Karoo.
+Do not create duplicate local bike records for the same Karoo bike.
+
+Ride Data Persistence
+Karoo distance events are reported in meters.
+Do not persist data for every distance event.
+Persist updated ride and mileage data every 100 meters of additional distance or when the ride ends, whichever comes first.
+
+UI
+Use Jetpack Compose for all user interface components.
+Use standard Material and Compose components whenever possible.
+If a required UI component is not available in standard libraries, use a well-supported external UI library.
+Custom UI components must be introduced only when no suitable external or built-in solution exists.
+The UI must not expose actions for creating, deleting, or editing bikes.
+The bike profile screen must display bike mileage obtained from the Karoo SDK.
+
+Platform
+Ensure full support for Android versions supported by Karoo devices, currently Android 9 and Android 12.
+
+Implementation Preferences
+Prefer well-established external libraries over custom implementations when appropriate.
+Avoid unnecessary dependencies.
+Do not use ANT+ SDK unless strictly necessary.
+Use Kotlin as the primary programming language.

@@ -1,0 +1,63 @@
+command to describe what you want to build. Focus on the what and why, not the tech stack.
+------------------------
+$speckit-specify
+
+As a cyclist, I want to manage my bike parts and track their mileage using bikes provided by Karoo.
+
+Description
+
+The system shall load bikes from Karoo and use them as the source of truth for available bikes.
+
+The system shall not allow the user to create, delete, or edit bikes manually.
+
+The system shall create local bike records from bikes returned by Karoo when they are first discovered.
+
+The system shall automatically add a new bike if Karoo returns a bike that does not yet exist locally.
+
+The system shall allow the user to select an active bike.
+
+A bike contains parts.
+
+The system shall display bike mileage in the bike profile.
+Bike mileage shall be obtained from Karoo.
+
+The system shall allow the user to add parts to a bike.
+Each part must have:
+- a name
+- a mileage value
+
+The default mileage of a part is 0.
+The user can set the initial mileage at creation time and modify it at any time.
+
+A part belongs to exactly one bike.
+
+Part names are not required to be unique within a bike.
+Each part is treated as a distinct entity, even if multiple parts share the same name.
+
+Each part has a status:
+- installed
+- archived
+
+The system shall track the distance ridden for the active bike during rides.
+
+The system shall increase the mileage of installed parts of the active bike based on the distance ridden while the parts are installed.
+
+The mileage of a part is defined as:
+manual mileage value + accumulated ridden distance while the part is installed.
+
+Archived parts:
+- retain their final mileage
+- do not accumulate additional distance
+- remain accessible for viewing
+
+The system shall allow the user to replace a part.
+Replacing a part results in:
+- the existing part being archived
+- a new part being created with its own mileage value
+
+The system shall allow the user to view:
+- all bikes
+- bike mileage
+- installed parts per bike
+- archived parts per bike
+- current mileage of each part

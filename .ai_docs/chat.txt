@@ -1,0 +1,14 @@
+Update the project to enforce the following rule:
+
+XXXXXXXXXXXXXXX
+
+Apply this change consistently across:
+- $speckit-specify
+- $speckit-plan
+- implementation
+- tests (if applicable)
+
+Also ensure:
+XXXXX
+
+Summarize the changes made.

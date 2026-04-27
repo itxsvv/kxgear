@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">KxGear</string>
+    <string name="hello_karoo">kxGear setup ready</string>
+    <string name="extension_name">kxGear Bike Parts</string>
+    <string name="bike_list_title">Bikes</string>
+    <string name="bike_form_add_title">Add Bike</string>
+    <string name="bike_form_edit_title">Edit Bike</string>
+</resources>

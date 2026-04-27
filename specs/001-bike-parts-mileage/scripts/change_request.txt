@@ -1,0 +1,18 @@
+1. Run from the `scripts` directory:
+   ./create-cr.sh 001-bike-parts-mileage 001 mileage-alerts
+
+2. Edit the created CR file. (specs/001-bike-parts-mileage/changes/xxx)
+
+3. Generate the analysis prompt:
+   ./analyze-cr-prompt.sh 001-bike-parts-mileage specs/001-bike-parts-mileage/changes/CR-001-mileage-alerts.md
+
+4. Paste the generated prompt into Codex to review the impact.
+
+5. Generate the apply prompt:
+   ./apply-cr-prompt.sh 001-bike-parts-mileage specs/001-bike-parts-mileage/changes/CR-001-mileage-alerts.md
+
+6. Paste the generated prompt into Codex to apply the CR to docs
+
+7. Review the updated spec artifacts
+
+8. $speckit-implement
