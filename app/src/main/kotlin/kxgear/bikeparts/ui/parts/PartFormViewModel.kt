@@ -33,7 +33,12 @@ data class PartFormUiState(
         get() = partId != null
 
     val alertButtonLabel: String
-        get() = "Alert ${curAlertMileage / 1000} / ${targetAlertMileage / 1000} km"
+        get() =
+            if (targetAlertMileage <= 0) {
+                "Add Alert"
+            } else {
+                "Alert ${curAlertMileage / 1000} / ${targetAlertMileage / 1000} km"
+            }
 }
 
 class PartFormViewModel(

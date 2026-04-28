@@ -169,7 +169,7 @@ class PartDetailsViewModelTest {
         assertTrue(success)
         assertEquals("", viewModel.uiState.value.targetAlertMileageInput)
         assertEquals("", viewModel.uiState.value.alertText)
-        assertEquals("Alert 0 / 0 km", viewModel.uiState.value.alertButtonLabel)
+        assertEquals("Add Alert", viewModel.uiState.value.alertButtonLabel)
     }
 
     @Test
