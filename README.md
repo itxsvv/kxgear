@@ -16,6 +16,7 @@ Original prompts: [Prompts](https://github.com/itxsvv/kxgear/tree/main/.ai_docs)
 Add a bike and its parts (e.g., a chain).  
 The app automatically tracks and increases each part’s mileage with every ride.  
 Set mileage alerts for each part. When a limit is reached, Karoo displays a notification.  
+![Screenshot](scr0.png) ![Screenshot](scr1.png) ![Screenshot](scr2.png)
 
 
 ## Installation
