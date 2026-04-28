@@ -1,23 +1,15 @@
-import java.util.Properties
+fun getLocalProperty(key: String, file: String = "local.properties"): String? {
+    val properties = java.util.Properties()
+    val localProperties = File(file)
+    if (localProperties.isFile) {
+        java.io.InputStreamReader(java.io.FileInputStream(localProperties), Charsets.UTF_8)
+            .use { reader ->
+                properties.load(reader)
+            }
+    } else error("File from not found")
 
-val localProperties = Properties()
-val localPropertiesFile = file("local.properties")
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.inputStream().use { localProperties.load(it) }
+    return properties.getProperty(key)
 }
-
-val githubPackagesUser =
-    providers.gradleProperty("gpr.user").orNull
-        ?: localProperties.getProperty("gpr.user")
-        ?: System.getenv("GITHUB_USER")
-        ?: System.getenv("USERNAME")
-
-val githubPackagesKey =
-    providers.gradleProperty("gpr.key").orNull
-        ?: localProperties.getProperty("gpr.key")
-        ?: System.getenv("GITHUB_TOKEN")
-        ?: System.getenv("TOKEN")
-
 pluginManagement {
     repositories {
         gradlePluginPortal()
@@ -25,6 +17,11 @@ pluginManagement {
         mavenCentral()
     }
 }
+
+val env: MutableMap<String, String> = System.getenv()
+val gprUser = if (env.containsKey("GPR_USER")) env["GPR_USER"] else getLocalProperty("gpr.user")
+val gprKey = if (env.containsKey("GPR_KEY")) env["GPR_KEY"] else getLocalProperty("gpr.key")
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -34,15 +31,8 @@ dependencyResolutionManagement {
         maven {
             url = uri("https://maven.pkg.github.com/hammerheadnav/karoo-ext")
             credentials {
-                username = githubPackagesUser
-                password = githubPackagesKey
-            }
-            if (githubPackagesUser.isNullOrBlank() || githubPackagesKey.isNullOrBlank()) {
-                throw GradleException(
-                    "Missing GitHub Packages credentials for karoo-ext. " +
-                        "Provide gpr.user and gpr.key in local.properties or gradle.properties, " +
-                        "or set GITHUB_USER and GITHUB_TOKEN environment variables.",
-                )
+                username = gprUser
+                password = gprKey
             }
         }
     }
