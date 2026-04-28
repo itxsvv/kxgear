@@ -125,7 +125,7 @@ class PartDetailsViewModelTest {
 
         assertEquals("250", viewModel.uiState.value.targetAlertMileageInput)
         assertEquals("Service cassette", viewModel.uiState.value.alertText)
-        assertEquals("Alert 50.0km / 250.0km", viewModel.uiState.value.alertButtonLabel)
+        assertEquals("Alert 50 / 250 km", viewModel.uiState.value.alertButtonLabel)
     }
 
     @Test
@@ -169,7 +169,7 @@ class PartDetailsViewModelTest {
         assertTrue(success)
         assertEquals("", viewModel.uiState.value.targetAlertMileageInput)
         assertEquals("", viewModel.uiState.value.alertText)
-        assertEquals("Alert 0.0km / 0.0km", viewModel.uiState.value.alertButtonLabel)
+        assertEquals("Alert 0 / 0 km", viewModel.uiState.value.alertButtonLabel)
     }
 
     @Test
