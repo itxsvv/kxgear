@@ -97,21 +97,22 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
   part identity remains based on the part record identifier.
 - Add `createdDate` to each part and set it when a part is created from Add
   Part or Replace Part.
-- Add optional `alertMileage` in kilometers and `alertText` to each part.
+- Add `curAlertMileage`, `targetAlertMileage`, and optional `alertText` to
+  each part.
 - Keep persisted mileage values in meters for bike mileage, ridden part
   mileage, and ride cursor state.
 - For older persisted parts that do not yet store `createdDate`, derive it from
   the existing persisted creation timestamp during load.
-- Track enough per-part alert state to avoid duplicate alerts for the same
-  threshold after persistence or app restart.
+- Keep `curAlertMileage` at `0` when alerting is disabled and reset it to `0`
+  after any emitted alert.
 - Treat `RideCursor` as the cumulative-distance baseline for the current
   recording ride only; reset it when a new recording ride starts so Karoo
   distance can restart from zero without being treated as invalid.
 - Display bike mileage values in meters at UI display boundaries.
 - Display part creation date at the top of Edit Part using `DD.MM.YY`.
-- Display alert state on Edit Part as a button labeled `Alert disabled` or
-  `Alert every Nkm`, and configure alerts from a dialog with alert text, alert
-  mileage, and Remove alert action.
+- Display alert state on Edit Part as a button labeled
+  `Alert curAlertMileage km / targetAlertMileage km`, and configure alerts from
+  a dialog with alert text, target alert mileage, and Remove alert action.
 - Keep `SharedMetadata` as the local active-bike and local bike index only.
 
 ### Integration Contracts
@@ -123,9 +124,10 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
 - Extend the local part UI contract so Edit Part exposes the persisted creation
   date separately from mutable ridden mileage and alert configuration.
 - Add a part alert contract: Edit Part can create, update, or remove alert
-  settings; saving alert configuration requires non-empty alert mileage; ride
-  processing emits one Android notification for the highest threshold crossed
-  by a single mileage update.
+  settings; saving alert configuration requires non-empty target alert
+  mileage; ride processing increments `curAlertMileage`, emits one Android
+  notification when `curAlertMileage` reaches or exceeds
+  `targetAlertMileage`, and then resets `curAlertMileage` to `0`.
 - Keep ride distance contract focused on cumulative distance deltas and the
   every-event update / every-100m persistence split.
 - Include ride-state handling in the ride input contract: accept distance only
@@ -139,8 +141,8 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
   this is acceptable only because non-recording events are filtered before
   domain processing and persistence.
 - Update JSON contract for locally managed bikes and preserved local part
-  files, including `createdDate`, alert configuration, and any persisted
-  anti-duplicate alert state.
+  files, including `createdDate`, `curAlertMileage`, `targetAlertMileage`, and
+  alert text.
 
 ### Agent Context Update
 
@@ -150,8 +152,7 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
 ## Phase 2: Implementation Strategy
 
 1. Extend the `Part` domain model and serialized DTO with persisted
-   `createdDate`, `alertMileage`, `alertText`, and any required alert progress
-   state.
+   `createdDate`, `curAlertMileage`, `targetAlertMileage`, and `alertText`.
 2. On Add Part and Replace Part, assign `createdDate` from the current clock
    time at the same moment the new part record is created.
 3. Preserve existing `createdDate` values when editing, archiving, deleting,
@@ -159,14 +160,15 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
 4. Add legacy load behavior so older persisted parts without `createdDate`
    reuse `createdAt`.
 5. Add Edit Part UI state and dialog behavior for alert configuration,
-   validation, and Remove alert.
-6. Add threshold-crossing detection so alerts fire at `N`, `2N`, `3N`, etc.,
-   including skipped exact thresholds, while emitting only one alert for the
-   highest threshold crossed by a single mileage update.
+   validation, Remove alert, and alert button display using current and target
+   alert mileage values.
+6. Add alert accumulation logic so accepted ride deltas increment
+   `curAlertMileage`, alerts fire when the current value reaches or exceeds the
+   target, and `curAlertMileage` then resets to `0`.
 7. Integrate Android notifications so alerts remain visible when kxgear is in
    the background and another app is active.
 8. Update unit and repository tests for Add Part, Replace Part, alert
-   persistence, validation, threshold crossing, duplicate prevention, and
+   persistence, validation, cur/target accumulation, reset behavior, and
    background alert behavior where testable.
 
 ## Complexity Tracking

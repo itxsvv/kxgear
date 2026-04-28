@@ -4,7 +4,7 @@
 ![GitHub Downloads (specific asset, all releases)](https://img.shields.io/github/downloads/itxsvv/kxgear/app-release.apk)
 
 ### AI-Powered Spec-Driven Development Workflow (using spec-kit)
-This project uses **AI Spec-Driven Development** (poject specs can be found here: [Specs](https://github.com/itxsvv/kxgear/specs))  
+This project uses **AI Spec-Driven Development** (poject specs can be found here: [Specs](https://github.com/itxsvv/kxgear/tree/main/specs/001-bike-parts-mileage))  
 behavior is defined in executable-style specs first, then refined into plans, tasks, code, and tests using an AI coding agent.  
 It follows the **GitHub [Spec Kit](https://github.com/github/spec-kit)** approach to keep requirements, design,  
 and implementation aligned while building a Kotlin/Jetpack Compose Karoo extension for tracking bikes,   

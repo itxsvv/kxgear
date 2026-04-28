@@ -36,9 +36,9 @@ class JsonBikeRepositoryTest {
         requireNotNull(loaded)
         assertEquals("Road", loaded.bike.name)
         assertEquals(1000L, loaded.parts.single().createdDate)
-        assertEquals(250, loaded.parts.single().alertMileage)
+        assertEquals(50000, loaded.parts.single().curAlertMileage)
+        assertEquals(250000, loaded.parts.single().targetAlertMileage)
         assertEquals("Service chain", loaded.parts.single().alertText)
-        assertEquals(250000, loaded.parts.single().lastAlertThresholdMeters)
         assertEquals(1, repository.listBikeFiles().size)
     }
 
@@ -134,9 +134,9 @@ class JsonBikeRepositoryTest {
                     status = PartStatus.INSTALLED,
                     createdAt = 1000,
                     createdDate = 1000,
-                    alertMileage = 250,
+                    curAlertMileage = 50000,
+                    targetAlertMileage = 250000,
                     alertText = "Service chain",
-                    lastAlertThresholdMeters = 250000,
                     updatedAt = 1000,
                 ),
             ),

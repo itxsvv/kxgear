@@ -112,7 +112,8 @@ class PartDetailsViewModelTest {
                                 part(
                                     "part-1",
                                     "Cassette",
-                                    alertMileage = 250,
+                                    curAlertMileage = 50000,
+                                    targetAlertMileage = 250000,
                                     alertText = "Service cassette",
                                 ),
                             ),
@@ -122,9 +123,9 @@ class PartDetailsViewModelTest {
 
         viewModel.startEdit("bike-1", "part-1")
 
-        assertEquals("250", viewModel.uiState.value.alertMileageInput)
+        assertEquals("250", viewModel.uiState.value.targetAlertMileageInput)
         assertEquals("Service cassette", viewModel.uiState.value.alertText)
-        assertEquals("Alert every 250km", viewModel.uiState.value.alertButtonLabel)
+        assertEquals("Alert 50.0km / 250.0km", viewModel.uiState.value.alertButtonLabel)
     }
 
     @Test
@@ -133,12 +134,12 @@ class PartDetailsViewModelTest {
         val viewModel = PartFormViewModel(gateway)
         viewModel.startEdit("bike-1", "part-1")
         viewModel.showAlertDialog()
-        viewModel.updateAlertMileage("")
+        viewModel.updateTargetAlertMileage("")
 
         val success = viewModel.saveAlertConfig()
 
         assertFalse(success)
-        assertEquals("Alert mileage is required", viewModel.uiState.value.errorMessage)
+        assertEquals("Target alert mileage is required", viewModel.uiState.value.errorMessage)
     }
 
     @Test
@@ -147,7 +148,16 @@ class PartDetailsViewModelTest {
             FakePartLifecycleGateway(
                 details =
                     bikeDetails(
-                        installedParts = listOf(part("part-1", "Cassette", alertMileage = 250, alertText = "Service cassette")),
+                        installedParts =
+                            listOf(
+                                part(
+                                    "part-1",
+                                    "Cassette",
+                                    curAlertMileage = 50000,
+                                    targetAlertMileage = 250000,
+                                    alertText = "Service cassette",
+                                ),
+                            ),
                     ),
             )
         val viewModel = PartFormViewModel(gateway)
@@ -157,9 +167,9 @@ class PartDetailsViewModelTest {
         val success = viewModel.removeAlert()
 
         assertTrue(success)
-        assertEquals("", viewModel.uiState.value.alertMileageInput)
+        assertEquals("", viewModel.uiState.value.targetAlertMileageInput)
         assertEquals("", viewModel.uiState.value.alertText)
-        assertEquals("Alert disabled", viewModel.uiState.value.alertButtonLabel)
+        assertEquals("Alert 0.0km / 0.0km", viewModel.uiState.value.alertButtonLabel)
     }
 
     @Test
@@ -167,13 +177,13 @@ class PartDetailsViewModelTest {
         val gateway = FakePartLifecycleGateway(details = bikeDetails(installedParts = listOf(part("part-1", "Cassette"))))
         val viewModel = PartFormViewModel(gateway)
         viewModel.startEdit("bike-1", "part-1")
-        viewModel.updateAlertMileage("300")
+        viewModel.updateTargetAlertMileage("300")
         viewModel.updateAlertText("Service cassette")
 
         val success = viewModel.submit()
 
         assertTrue(success)
-        assertEquals(300, gateway.lastUpdatedAlertMileage)
+        assertEquals(300, gateway.lastUpdatedTargetAlertMileage)
         assertEquals("Service cassette", gateway.lastUpdatedAlertText)
     }
 
@@ -201,7 +211,8 @@ class PartDetailsViewModelTest {
         name: String,
         riddenMileage: Int = 0,
         status: PartStatus = PartStatus.INSTALLED,
-        alertMileage: Int? = null,
+        curAlertMileage: Int = 0,
+        targetAlertMileage: Int = 0,
         alertText: String? = null,
     ): Part =
         Part(
@@ -211,7 +222,8 @@ class PartDetailsViewModelTest {
             status = status,
             createdAt = 1000L,
             createdDate = 1000L,
-            alertMileage = alertMileage,
+            curAlertMileage = curAlertMileage,
+            targetAlertMileage = targetAlertMileage,
             alertText = alertText,
             updatedAt = 1000L,
             archivedAt = if (status == PartStatus.ARCHIVED) 1500L else null,
@@ -228,7 +240,7 @@ class PartDetailsViewModelTest {
             private set
         var lastUpdatedMileage: Int? = null
             private set
-        var lastUpdatedAlertMileage: Int? = null
+        var lastUpdatedTargetAlertMileage: Int? = null
             private set
         var lastUpdatedAlertText: String? = null
             private set
@@ -269,11 +281,11 @@ class PartDetailsViewModelTest {
             partId: String,
             name: String,
             riddenMileage: Int,
-            alertMileage: Int?,
+            targetAlertMileage: Int?,
             alertText: String?,
         ): BikeDetails {
             lastUpdatedMileage = riddenMileage
-            lastUpdatedAlertMileage = alertMileage
+            lastUpdatedTargetAlertMileage = targetAlertMileage
             lastUpdatedAlertText = alertText
             bikeDetails =
                 bikeDetails.copy(
@@ -283,7 +295,8 @@ class PartDetailsViewModelTest {
                                 part.copy(
                                     name = name,
                                     riddenMileage = riddenMileage,
-                                    alertMileage = alertMileage,
+                                    curAlertMileage = if (targetAlertMileage == null) 0 else part.curAlertMileage,
+                                    targetAlertMileage = if (targetAlertMileage == null) 0 else targetAlertMileage * 1000,
                                     alertText = alertText,
                                 )
                             } else {

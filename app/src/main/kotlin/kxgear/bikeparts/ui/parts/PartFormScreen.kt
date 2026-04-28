@@ -132,10 +132,10 @@ fun PartFormScreen(
                         enabled = canMutate,
                     )
                     OutlinedTextField(
-                        value = state.alertMileageInput,
+                        value = state.targetAlertMileageInput,
                         onValueChange = onAlertMileageChange,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Alert mileage (km)") },
+                        label = { Text("Target alert mileage (km)") },
                         singleLine = true,
                         enabled = canMutate,
                     )

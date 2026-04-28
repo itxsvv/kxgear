@@ -55,13 +55,14 @@ class PartLifecycleServiceTest {
 
         val details = service.updatePart("bike-1", "part-1", "Chain", 0, 250, "Service chain")
 
-        assertEquals(250, details.installedParts.single().alertMileage)
+        assertEquals(250000, details.installedParts.single().targetAlertMileage)
+        assertEquals(0, details.installedParts.single().curAlertMileage)
         assertEquals("Service chain", details.installedParts.single().alertText)
-        assertEquals(250, repository.requireBike("bike-1").parts.single().alertMileage)
+        assertEquals(250000, repository.requireBike("bike-1").parts.single().targetAlertMileage)
     }
 
     @Test
-    fun updatePartResetsAlertProgressWhenMileageChanges() = runBlocking {
+    fun updatePartResetsAlertProgressWhenTargetChanges() = runBlocking {
         val repository =
             InMemoryBikeRepository(
                 bikeFile(
@@ -70,8 +71,8 @@ class PartLifecycleServiceTest {
                             part(
                                 partId = "part-1",
                                 name = "Chain",
-                                alertMileage = 250,
-                                lastAlertThresholdMeters = 250000,
+                                curAlertMileage = 50000,
+                                targetAlertMileage = 250000,
                             ),
                         ),
                 ),
@@ -80,7 +81,8 @@ class PartLifecycleServiceTest {
 
         val details = service.updatePart("bike-1", "part-1", "Chain", 0, 500, "Service chain")
 
-        assertEquals(null, details.installedParts.single().lastAlertThresholdMeters)
+        assertEquals(0, details.installedParts.single().curAlertMileage)
+        assertEquals(500000, details.installedParts.single().targetAlertMileage)
     }
 
     @Test
@@ -178,9 +180,9 @@ class PartLifecycleServiceTest {
         riddenMileage: Int = 0,
         status: PartStatus = PartStatus.INSTALLED,
         createdDate: Long = 1000L,
-        alertMileage: Int? = null,
+        curAlertMileage: Int = 0,
+        targetAlertMileage: Int = 0,
         alertText: String? = null,
-        lastAlertThresholdMeters: Int? = null,
     ): Part =
         Part(
             partId = partId,
@@ -189,9 +191,9 @@ class PartLifecycleServiceTest {
             status = status,
             createdAt = 1000L,
             createdDate = createdDate,
-            alertMileage = alertMileage,
+            curAlertMileage = curAlertMileage,
+            targetAlertMileage = targetAlertMileage,
             alertText = alertText,
-            lastAlertThresholdMeters = lastAlertThresholdMeters,
             updatedAt = 1000L,
         )
 

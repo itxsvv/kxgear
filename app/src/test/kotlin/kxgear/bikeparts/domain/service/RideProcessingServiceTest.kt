@@ -192,7 +192,7 @@ class RideProcessingServiceTest {
             bikeFile(
                 bikeMileageMeters = 1000,
                 rideCursor = RideCursor(lastAcceptedMetricValue = 100, lastAcceptedAt = 1000L),
-                parts = listOf(part(riddenMileage = 995, alertMileage = 1, alertText = "Service chain")),
+                parts = listOf(part(riddenMileage = 995, curAlertMileage = 995, targetAlertMileage = 1000, alertText = "Service chain")),
             )
         val bikeRepository = InMemoryBikeRepository(initial)
         val metadataRepository = InMemoryMetadataRepository(SharedMetadata(activeBikeId = "bike-1"))
@@ -205,15 +205,15 @@ class RideProcessingServiceTest {
         assertEquals(1, notifier.alerts.size)
         assertEquals(1000, notifier.alerts.single().thresholdMeters)
         assertEquals(1005, bikeRepository.requireBike("bike-1").parts.single().riddenMileage)
-        assertEquals(1000, bikeRepository.requireBike("bike-1").parts.single().lastAlertThresholdMeters)
+        assertEquals(0, bikeRepository.requireBike("bike-1").parts.single().curAlertMileage)
     }
 
     @Test
-    fun processRideMetricUsesHighestThresholdForLargeJump() {
+    fun processRideMetricResetsCurrentAlertMileageAfterLargeJump() {
         val initial =
             bikeFile(
                 rideCursor = RideCursor(lastAcceptedMetricValue = 100, lastAcceptedAt = 1000L),
-                parts = listOf(part(riddenMileage = 900, alertMileage = 1)),
+                parts = listOf(part(riddenMileage = 900, curAlertMileage = 900, targetAlertMileage = 1000)),
             )
         val bikeRepository = InMemoryBikeRepository(initial)
         val metadataRepository = InMemoryMetadataRepository(SharedMetadata(activeBikeId = "bike-1"))
@@ -225,26 +225,31 @@ class RideProcessingServiceTest {
         }
 
         assertEquals(1, notifier.alerts.size)
-        assertEquals(3000, notifier.alerts.single().thresholdMeters)
+        assertEquals(1000, notifier.alerts.single().thresholdMeters)
+        assertEquals(0, bikeRepository.requireBike("bike-1").parts.single().curAlertMileage)
     }
 
     @Test
-    fun processRideMetricDoesNotEmitDuplicateAlertForSameThreshold() {
+    fun processRideMetricAccumulatesCurrentAlertMileageWithoutAlertBelowTarget() {
         val initial =
             bikeFile(
                 rideCursor = RideCursor(lastAcceptedMetricValue = 1000, lastAcceptedAt = 1000L),
-                parts = listOf(part(riddenMileage = 1005, alertMileage = 1, lastAlertThresholdMeters = 1000)),
+                parts = listOf(part(riddenMileage = 1005, curAlertMileage = 100, targetAlertMileage = 1000)),
             )
         val bikeRepository = InMemoryBikeRepository(initial)
         val metadataRepository = InMemoryMetadataRepository(SharedMetadata(activeBikeId = "bike-1"))
         val notifier = RecordingPartAlertNotifier()
         val service = createService(metadataRepository, bikeRepository, notifier)
 
-        runBlocking {
-            service.processRideMetric(metricValue = 1010, recordedAt = 2000L)
-        }
+        val result =
+            runBlocking {
+                service.processRideMetric(metricValue = 1010, recordedAt = 2000L)
+            }
 
         assertEquals(0, notifier.alerts.size)
+        assertTrue(result is RideProcessingResult.Deferred)
+        result as RideProcessingResult.Deferred
+        assertEquals(110, result.bikeFile.parts.single().curAlertMileage)
     }
 
     @Test
@@ -252,7 +257,7 @@ class RideProcessingServiceTest {
         val initial =
             bikeFile(
                 rideCursor = RideCursor(lastAcceptedMetricValue = 100, lastAcceptedAt = 1000L),
-                parts = listOf(part(riddenMileage = 995, alertMileage = 1)),
+                parts = listOf(part(riddenMileage = 995, curAlertMileage = 995, targetAlertMileage = 1000)),
             )
         val bikeRepository = InMemoryBikeRepository(initial)
         val metadataRepository = InMemoryMetadataRepository(SharedMetadata(activeBikeId = "bike-1"))
@@ -301,9 +306,9 @@ class RideProcessingServiceTest {
     private fun part(
         riddenMileage: Int = 0,
         status: PartStatus = PartStatus.INSTALLED,
-        alertMileage: Int? = null,
+        curAlertMileage: Int = 0,
+        targetAlertMileage: Int = 0,
         alertText: String? = null,
-        lastAlertThresholdMeters: Int? = null,
     ): Part =
         Part(
             partId = "part-1",
@@ -311,9 +316,9 @@ class RideProcessingServiceTest {
             riddenMileage = riddenMileage,
             status = status,
             createdAt = 1000L,
-            alertMileage = alertMileage,
+            curAlertMileage = curAlertMileage,
+            targetAlertMileage = targetAlertMileage,
             alertText = alertText,
-            lastAlertThresholdMeters = lastAlertThresholdMeters,
             updatedAt = 1000L,
             archivedAt = null,
         )

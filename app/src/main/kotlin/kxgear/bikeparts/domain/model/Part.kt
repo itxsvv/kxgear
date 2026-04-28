@@ -12,9 +12,9 @@ data class Part(
     val status: PartStatus,
     val createdAt: Long,
     val createdDate: Long = createdAt,
-    val alertMileage: Int? = null,
+    val curAlertMileage: Int = 0,
+    val targetAlertMileage: Int = 0,
     val alertText: String? = null,
-    val lastAlertThresholdMeters: Int? = null,
     val updatedAt: Long,
     val archivedAt: Long? = null,
 ) {

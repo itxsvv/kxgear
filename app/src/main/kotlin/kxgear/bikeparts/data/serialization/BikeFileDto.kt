@@ -32,8 +32,13 @@ data class PartDto(
     val status: String,
     val createdAt: Long,
     val createdDate: Long? = null,
-    val alertMileage: Int? = null,
+    val curAlertMileage: Int? = null,
+    val targetAlertMileage: Int? = null,
     val alertText: String? = null,
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @SerialName("alertMileage")
+    val legacyAlertMileageKilometers: Int? = null,
     val lastAlertThresholdMeters: Int? = null,
     val updatedAt: Long,
     val archivedAt: Long? = null,
@@ -74,9 +79,9 @@ fun BikeFile.toDto(): BikeFileDto =
                 status = part.status.name,
                 createdAt = part.createdAt,
                 createdDate = part.createdDate,
-                alertMileage = part.alertMileage,
+                curAlertMileage = part.curAlertMileage,
+                targetAlertMileage = part.targetAlertMileage,
                 alertText = part.alertText,
-                lastAlertThresholdMeters = part.lastAlertThresholdMeters,
                 updatedAt = part.updatedAt,
                 archivedAt = part.archivedAt,
             )
@@ -100,6 +105,7 @@ fun BikeFileDto.toDomain(): BikeFile =
             updatedAt = bike.updatedAt,
         ),
         parts = parts.map { part ->
+            val migratedTargetAlertMileage = part.targetAlertMileage ?: (part.legacyAlertMileageKilometers?.times(1000) ?: 0)
             Part(
                 partId = part.partId,
                 name = part.name,
@@ -107,9 +113,9 @@ fun BikeFileDto.toDomain(): BikeFile =
                 status = PartStatus.valueOf(part.status),
                 createdAt = part.createdAt,
                 createdDate = part.createdDate ?: part.createdAt,
-                alertMileage = part.alertMileage,
+                curAlertMileage = part.curAlertMileage ?: 0,
+                targetAlertMileage = migratedTargetAlertMileage,
                 alertText = part.alertText,
-                lastAlertThresholdMeters = part.lastAlertThresholdMeters,
                 updatedAt = part.updatedAt,
                 archivedAt = part.archivedAt,
             )

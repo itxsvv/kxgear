@@ -52,12 +52,13 @@
   Replace Part. The Edit Part screen shows that date at the top in `DD.MM.YY`
   format.
 - Q: How should recurring maintenance alerts work for parts? → A: Each part
-  may store `alertMileage` in kilometers and `alertText` for notification
-  content. Alerts fire whenever ridden mileage crosses a multiple of the alert
-  interval, even if the exact threshold is skipped, and only one alert is shown
-  for the highest threshold crossed by a single mileage update. Alert settings
-  are managed from the Edit Part screen by an alert button that opens a dialog
-  with alert text and alert mileage fields plus a Remove alert action.
+  stores `curAlertMileage`, `targetAlertMileage`, and `alertText` for
+  notification content. `curAlertMileage` starts at `0`, increases with
+  accepted ride deltas while the alert is enabled, and resets to `0` after an
+  alert is emitted because the current value reached or exceeded
+  `targetAlertMileage`. Alert settings are managed from the Edit Part screen by
+  an alert button that opens a dialog with alert text and target alert mileage
+  fields plus a Remove alert action.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -124,13 +125,13 @@ changes.
    screen in `DD.MM.YY` format.
 6. **Given** the user opens Edit Part, **When** alert settings are not
    configured for that part, **Then** the screen shows an alert button labeled
-   `Alert disabled`.
+   `Alert 0.0km / 0.0km`.
 7. **Given** the user opens Edit Part, **When** alert settings are configured
    for that part, **Then** the screen shows an alert button labeled
-   `Alert every Nkm`.
+   `Alert curAlertMileage km / targetAlertMileage km`.
 8. **Given** the user taps the alert button on Edit Part, **When** the alert
    dialog opens, **Then** it shows editable fields for alert text and alert
-   mileage plus a `Remove alert` action.
+   target mileage plus a `Remove alert` action.
 
 ---
 
@@ -168,12 +169,12 @@ recording ends.
    of being rejected as decreasing.
 6. **Given** the ride is idle or paused, **When** distance updates arrive,
    **Then** those updates do not increase part mileage.
-7. **Given** a part has alert mileage `N`, **When** a mileage update crosses a
-   multiple of `N`, **Then** the system shows a maintenance alert even if the
-   exact threshold value was skipped.
-8. **Given** a single mileage update crosses multiple alert thresholds,
-   **When** the update is processed, **Then** the system shows one alert for the
-   highest crossed threshold only.
+7. **Given** a part has `targetAlertMileage` configured, **When**
+   `curAlertMileage + delta` reaches or exceeds that target, **Then** the
+   system shows a maintenance alert and resets `curAlertMileage` to `0`.
+8. **Given** a single mileage update exceeds the remaining alert distance by
+   more than one target interval, **When** the update is processed, **Then**
+   the system still shows one alert and resets `curAlertMileage` to `0`.
 
 ---
 
@@ -236,14 +237,15 @@ mutating actions are disabled outside idle.
 - What happens when an existing persisted part predates `createdDate` storage?
   The app continues to show that part with a creation date derived from its
   persisted creation timestamp.
-- What happens when alert mileage is empty in the alert dialog? Saving is
+- What happens when target alert mileage is empty in the alert dialog? Saving is
   rejected as a validation error.
 - What happens when a part has no alert configured? The Edit Part button label
-  shows `Alert disabled` and no maintenance alerts are generated.
-- What happens when a mileage update skips past an exact alert interval? The
-  system still treats the threshold as crossed and generates the alert.
-- What happens when a single mileage update crosses multiple alert intervals?
-  The system generates one alert for the highest crossed threshold only.
+  shows `Alert 0.0km / 0.0km` and no maintenance alerts are generated.
+- What happens when a mileage update is larger than the remaining alert
+  distance? The system emits one alert and resets `curAlertMileage` to `0`.
+- What happens when a single mileage update exceeds more than one target
+  interval? The system still emits one alert and resets `curAlertMileage` to
+  `0`.
 - What happens when the user no longer wants alerts for a part? The user can
   remove the alert configuration from the Edit Part dialog.
 
@@ -288,21 +290,23 @@ mutating actions are disabled outside idle.
   of the screen.
 - **FR-010f**: The part creation date shown in Edit Part MUST use `DD.MM.YY`
   format.
-- **FR-010g**: Each part MAY persist an `alertMileage` value in kilometers.
-- **FR-010h**: Each part MAY persist an `alertText` value used in maintenance
+- **FR-010g**: Each part MUST persist a `curAlertMileage` value that starts at
+  `0`.
+- **FR-010h**: Each part MUST persist a `targetAlertMileage` value that starts
+  at `0`.
+- **FR-010i**: Each part MAY persist an `alertText` value used in maintenance
   alerts.
-- **FR-010i**: The Edit Part screen MUST show an alert button for each editable
-  part.
-- **FR-010j**: If no alert is configured for a part, the Edit Part alert button
-  MUST show `Alert disabled`.
-- **FR-010k**: If alert mileage is configured for a part, the Edit Part alert
-  button MUST show `Alert every Nkm`.
+- **FR-010j**: The Edit Part screen MUST show an alert button for each
+  editable part.
+- **FR-010k**: The Edit Part alert button MUST show
+  `Alert curAlertMileage km / targetAlertMileage km`.
 - **FR-010l**: Tapping the alert button on Edit Part MUST open a dialog with
-  editable `alertText` and `alertMileage` fields.
-- **FR-010m**: Saving alert configuration with empty alert mileage MUST be
-  rejected as a validation error.
+  editable `alertText` and `targetAlertMileage` fields.
+- **FR-010m**: Saving alert configuration with empty target alert mileage MUST
+  be rejected as a validation error.
 - **FR-010n**: The alert dialog MUST include a `Remove alert` action that
-  clears the alert configuration for that part.
+  clears the alert configuration for that part and resets both
+  `curAlertMileage` and `targetAlertMileage` to `0`.
 - **FR-011**: The system MUST show bike mileage on each bike panel in the bike
   list.
 - **FR-011a**: The system MUST display user-facing bike mileage in meters.
@@ -328,16 +332,16 @@ mutating actions are disabled outside idle.
 - **FR-014c**: The system MAY keep the Karoo distance stream subscribed while
   ride state is idle or paused, but those events MUST NOT mutate mileage or
   trigger disk writes.
-- **FR-014d**: When part mileage crosses a multiple of configured alert
-  mileage, the system MUST show an Android alert/notification visible even if
-  kxgear is in the background and another application is active.
-- **FR-014e**: Alert thresholds MUST be evaluated on threshold crossing, not
-  only on exact equality with the configured mileage interval.
-- **FR-014f**: If a single mileage update crosses multiple thresholds for the
-  same part, the system MUST show one alert for the highest crossed threshold
-  only.
-- **FR-014g**: The system MUST NOT emit duplicate alerts for the same threshold
-  crossing.
+- **FR-014d**: When alerting is enabled for a part, the system MUST add each
+  accepted ride delta to that part's `curAlertMileage`.
+- **FR-014e**: When `curAlertMileage` reaches or exceeds `targetAlertMileage`,
+  the system MUST show an Android alert/notification visible even if kxgear is
+  in the background and another application is active.
+- **FR-014f**: After an alert is emitted, the system MUST reset that part's
+  `curAlertMileage` to `0`.
+- **FR-014g**: If a single mileage update exceeds the remaining distance to the
+  target by more than one interval, the system MUST still emit one alert and
+  reset `curAlertMileage` to `0`.
 - **FR-015**: The bike list MUST render each bike as a panel whose first row
   shows bike name on the left and bike mileage on the right.
 - **FR-016**: The bike list MUST render View Bike on the left, Edit in the
@@ -381,16 +385,17 @@ mutating actions are disabled outside idle.
 - **Local Bike Record**: The persisted bike file used by kxgear to store bike
   name, bike mileage, part history, and ride cursor data.
 - **Part**: An installed or archived maintenance item whose current mileage is
-  derived from ridden mileage and that also stores its creation date and
-  optional alert settings.
+  derived from ridden mileage and that also stores its creation date,
+  `curAlertMileage`, `targetAlertMileage`, and optional alert text.
 - **Ride Cursor**: The last accepted cumulative ride distance used to derive
   deltas safely within the current recording ride.
 - **Ride Session**: A recording interval whose cumulative Karoo distance starts
   from its own baseline and is flushed when recording stops or pauses.
 - **Ride-State UI Gate**: The current ride-state-derived permission that allows
   navigation at all times but allows bike and part mutations only while idle.
-- **Part Alert Configuration**: The per-part maintenance interval and alert
-  text used to decide when recurring maintenance notifications should be shown.
+- **Part Alert Configuration**: The per-part current alert progress, target
+  alert distance, and alert text used to decide when maintenance notifications
+  should be shown.
 - **Shared Metadata**: Lightweight cross-bike state containing the active bike
   selection and sorted local bike index.
 
@@ -420,12 +425,15 @@ mutating actions are disabled outside idle.
 - **SC-010**: In 100% of newly added or replacement parts, the stored creation
   date matches the save time and is available in Edit Part in `DD.MM.YY`
   format.
-- **SC-011**: In 100% of parts with alert settings saved from Edit Part, alert
-  mileage and alert text persist across app restart.
-- **SC-012**: In 100% of mileage updates that cross an alert interval, the
-  system emits a maintenance alert even if the exact threshold value is skipped.
-- **SC-013**: In 100% of mileage updates that cross multiple intervals for the
-  same part, the system emits one alert for the highest crossed threshold only.
+- **SC-011**: In 100% of parts with alert settings saved from Edit Part,
+  `curAlertMileage`, `targetAlertMileage`, and alert text persist across app
+  restart.
+- **SC-012**: In 100% of accepted ride updates for a part with alerts enabled,
+  the system increments `curAlertMileage` by the accepted ride delta until an
+  alert is emitted.
+- **SC-013**: In 100% of cases where `curAlertMileage` reaches or exceeds
+  `targetAlertMileage`, the system emits one maintenance alert and resets
+  `curAlertMileage` to `0`.
 - **SC-014**: In 100% of parts without alert configuration, no maintenance
   alerts are emitted.
 

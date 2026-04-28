@@ -86,7 +86,7 @@ fun BikeDetailsRoute(
                 onRiddenMileageChange = partFormViewModel::updateRiddenMileage,
                 onShowAlertDialog = partFormViewModel::showAlertDialog,
                 onDismissAlertDialog = partFormViewModel::dismissAlertDialog,
-                onAlertMileageChange = partFormViewModel::updateAlertMileage,
+                onAlertMileageChange = partFormViewModel::updateTargetAlertMileage,
                 onAlertTextChange = partFormViewModel::updateAlertText,
                 onSaveAlert = {
                     scope.launch {

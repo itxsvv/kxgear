@@ -38,10 +38,10 @@
 - [X] Persist ride updates every 100 meters or when recording stops.
 - [X] Document that the Karoo distance stream may remain subscribed outside
   recording if non-recording events are ignored before persistence.
-- [X] Detect per-part alert threshold crossings at `N`, `2N`, `3N`, etc., even
-  when the exact threshold value is skipped.
-- [X] Emit one alert for the highest threshold crossed by a single mileage
-  update and prevent duplicate alerts for the same threshold.
+- [X] Accumulate per-part `curAlertMileage` from accepted ride deltas while a
+  non-zero `targetAlertMileage` is configured.
+- [X] Emit one alert when `curAlertMileage` reaches or exceeds
+  `targetAlertMileage`, then reset `curAlertMileage` to `0`.
 - [X] Integrate Android notifications so maintenance alerts are visible while
   kxgear is backgrounded and another app is active.
 
@@ -50,5 +50,5 @@
 - [X] Keep repository, lifecycle, part, restart, and ride-processing tests
   aligned with local bike management.
 - [X] Validate focused Kotlin compilation and JVM unit tests.
-- [X] Add tests for alert persistence, Edit Part alert configuration, threshold
-  crossing behavior, skipped-threshold handling, and duplicate-prevention logic.
+- [X] Add tests for alert persistence, Edit Part alert configuration,
+  `curAlertMileage` accumulation, reset behavior, and zero-target behavior.

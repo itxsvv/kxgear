@@ -98,7 +98,7 @@ class PartReplacementViewModelTest {
             partId: String,
             name: String,
             riddenMileage: Int,
-            alertMileage: Int?,
+            targetAlertMileage: Int?,
             alertText: String?,
         ): BikeDetails = details
 

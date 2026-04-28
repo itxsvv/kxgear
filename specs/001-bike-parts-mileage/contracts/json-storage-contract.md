@@ -12,6 +12,7 @@ cursor data using JSON files only with one bike stored per file.
   - local bike record identity
   - bike name and mileage in meters
   - installed and archived parts
+  - per-part `curAlertMileage`, `targetAlertMileage`, and optional alert text
   - ride cursor state
 - One shared metadata file stores only the active-bike selection and visible
   local bike index

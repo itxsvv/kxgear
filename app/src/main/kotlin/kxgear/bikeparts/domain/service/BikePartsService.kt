@@ -48,20 +48,31 @@ class BikePartsService {
         val updatedParts = bikeFile.parts.map { part ->
             if (part.status == PartStatus.INSTALLED) {
                 val updatedMileage = part.riddenMileage + delta
-                val crossedThreshold = highestCrossedThreshold(part, updatedMileage)
-                if (crossedThreshold != null) {
+                val updatedCurAlertMileage =
+                    if (part.targetAlertMileage > 0) {
+                        part.curAlertMileage + delta
+                    } else {
+                        0
+                    }
+                val isAlertTriggered = part.targetAlertMileage > 0 && updatedCurAlertMileage >= part.targetAlertMileage
+                if (isAlertTriggered) {
                     alerts +=
                         PartAlert(
                             partId = part.partId,
                             partName = part.name,
                             alertText = part.alertText,
-                            thresholdMeters = crossedThreshold,
+                            thresholdMeters = part.targetAlertMileage,
                             currentMileageMeters = updatedMileage,
                         )
                 }
                 part.copy(
                     riddenMileage = updatedMileage,
-                    lastAlertThresholdMeters = crossedThreshold ?: part.lastAlertThresholdMeters,
+                    curAlertMileage =
+                        when {
+                            part.targetAlertMileage <= 0 -> 0
+                            isAlertTriggered -> 0
+                            else -> updatedCurAlertMileage
+                        },
                     updatedAt = recordedAt,
                 )
             } else {
@@ -85,29 +96,6 @@ class BikePartsService {
                 ),
             alerts = alerts,
         )
-    }
-
-    private fun highestCrossedThreshold(
-        part: Part,
-        updatedMileage: Int,
-    ): Int? {
-        val alertMileageKm = part.alertMileage ?: return null
-        if (alertMileageKm <= 0) {
-            return null
-        }
-
-        val intervalMeters = alertMileageKm * 1000
-        val highestCrossed = (updatedMileage / intervalMeters) * intervalMeters
-        if (highestCrossed <= part.riddenMileage) {
-            return null
-        }
-
-        val lastAlertThresholdMeters = part.lastAlertThresholdMeters ?: 0
-        if (highestCrossed <= lastAlertThresholdMeters) {
-            return null
-        }
-
-        return highestCrossed
     }
 
     fun archivePart(

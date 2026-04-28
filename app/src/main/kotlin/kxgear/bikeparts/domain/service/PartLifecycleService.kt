@@ -37,7 +37,7 @@ interface PartLifecycleGateway {
         partId: String,
         name: String,
         riddenMileage: Int,
-        alertMileage: Int?,
+        targetAlertMileage: Int?,
         alertText: String?,
     ): BikeDetails
 
@@ -105,13 +105,13 @@ class PartLifecycleService(
         partId: String,
         name: String,
         riddenMileage: Int,
-        alertMileage: Int?,
+        targetAlertMileage: Int?,
         alertText: String?,
     ): BikeDetails {
         val bikeFile = loadRequiredBikeFile(bikeId)
         val normalizedName = validatePartName(name)
         BikePartsValidators.requireWholeMileage(riddenMileage)
-        val normalizedAlertConfig = normalizeAlertConfig(alertMileage = alertMileage, alertText = alertText)
+        val normalizedAlertConfig = normalizeAlertConfig(targetAlertMileage = targetAlertMileage, alertText = alertText)
 
         var found = false
         val now = clock()
@@ -122,14 +122,14 @@ class PartLifecycleService(
                     part.copy(
                         name = normalizedName,
                         riddenMileage = riddenMileage,
-                        alertMileage = normalizedAlertConfig?.first,
-                        alertText = normalizedAlertConfig?.second,
-                        lastAlertThresholdMeters =
+                        targetAlertMileage = normalizedAlertConfig?.first ?: 0,
+                        curAlertMileage =
                             when {
-                                normalizedAlertConfig == null -> null
-                                part.alertMileage != normalizedAlertConfig.first -> null
-                                else -> part.lastAlertThresholdMeters
+                                normalizedAlertConfig == null -> 0
+                                part.targetAlertMileage != normalizedAlertConfig.first -> 0
+                                else -> part.curAlertMileage
                             },
+                        alertText = normalizedAlertConfig?.second,
                         updatedAt = now,
                     )
                 } else {
@@ -227,17 +227,17 @@ class PartLifecycleService(
     private fun validatePartName(name: String): String = name.trim().requireNonBlank("Part name is required")
 
     private fun normalizeAlertConfig(
-        alertMileage: Int?,
+        targetAlertMileage: Int?,
         alertText: String?,
     ): Pair<Int, String?>? {
         val trimmedText = alertText?.trim().orEmpty().ifBlank { null }
-        if (alertMileage == null) {
+        if (targetAlertMileage == null) {
             return null
         }
-        if (alertMileage <= 0) {
-            throw RepositoryError.Validation("Alert mileage must be a positive whole number in kilometers")
+        if (targetAlertMileage <= 0) {
+            throw RepositoryError.Validation("Target alert mileage must be a positive whole number in kilometers")
         }
-        return alertMileage to trimmedText
+        return targetAlertMileage * 1000 to trimmedText
     }
 
     private fun String.requireNonBlank(message: String): String {

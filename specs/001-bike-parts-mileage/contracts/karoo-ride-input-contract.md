@@ -36,11 +36,16 @@ mileage updates for the selected local bike.
 4. If the incoming cumulative value is greater than the last accepted value,
    derive `delta = incoming - lastAccepted`.
 5. Apply `delta` immediately to every installed part on the active bike.
-6. Persist the updated bike file only when 100 additional meters have
-   accumulated since the last persisted ride state, or when the ride ends.
-7. If there is no active bike, the active bike file is missing, the value is
+6. For each installed part whose `targetAlertMileage` is greater than `0`, add
+   `delta` to `curAlertMileage`.
+7. If `curAlertMileage` reaches or exceeds `targetAlertMileage`, emit one
+   maintenance alert and reset `curAlertMileage` to `0`.
+8. Persist the updated bike file when 100 additional meters have accumulated
+   since the last persisted ride state, when an alert is emitted, or when the
+   ride ends.
+9. If there is no active bike, the active bike file is missing, the value is
    duplicate, or the value decreases, do not persist a bike file update.
-8. If ride state is not `RECORDING`, ignore distance stream events before
+10. If ride state is not `RECORDING`, ignore distance stream events before
    domain ride processing; ignored non-recording events must not mutate mileage
    or trigger disk writes.
 

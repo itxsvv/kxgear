@@ -71,9 +71,9 @@ class PartRepositoryTest {
         val reloaded = JsonBikeRepository(root.resolve("bikes"), json, AtomicJsonFileStore(), Dispatchers.Unconfined)
         val bikeFile = reloaded.getBikeFile("bike-1")
 
-        assertEquals(250, bikeFile?.parts?.single()?.alertMileage)
+        assertEquals(0, bikeFile?.parts?.single()?.curAlertMileage)
+        assertEquals(250000, bikeFile?.parts?.single()?.targetAlertMileage)
         assertEquals("Service chain", bikeFile?.parts?.single()?.alertText)
-        assertEquals(null, bikeFile?.parts?.single()?.lastAlertThresholdMeters)
     }
 
     private fun createBikeLifecycleService(

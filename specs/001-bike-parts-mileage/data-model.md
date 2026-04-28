@@ -39,6 +39,9 @@
 - `status`
 - `createdAt`
 - `createdDate`
+- `curAlertMileage`
+- `targetAlertMileage`
+- `alertText`
 - `updatedAt`
 - `archivedAt`
 
@@ -49,8 +52,16 @@
 - Installed parts gain ridden mileage from accepted ride deltas.
 - Archived parts keep their final mileage and stop accumulating.
 - Ridden and current mileage are stored in meters.
+- `curAlertMileage` and `targetAlertMileage` are stored in meters and shown in
+  the UI in kilometers.
 - `createdDate` stores the part creation timestamp for UI display and is set
   when the user creates a part from Add Part or Replace Part.
+- `curAlertMileage` starts at `0`.
+- `targetAlertMileage` starts at `0`, which means alerting is disabled.
+- When a part alert is configured or reconfigured, `curAlertMileage` resets to
+  `0`.
+- When `curAlertMileage` reaches or exceeds `targetAlertMileage`, the app emits
+  one alert and resets `curAlertMileage` to `0`.
 - For legacy persisted parts that do not yet store `createdDate`, the app
   derives it from `createdAt` during load.
 
@@ -100,8 +111,12 @@
 
 1. Accept a new cumulative distance event for the active local bike.
 2. Apply ride delta to installed parts immediately.
-3. Persist when 100 additional meters have accumulated since the last persisted
-   bike file, or when the ride ends.
+3. Add the same accepted ride delta to `curAlertMileage` for each installed
+   part whose `targetAlertMileage` is greater than `0`.
+4. Reset `curAlertMileage` to `0` and emit one alert when the current value
+   reaches or exceeds the target.
+5. Persist when 100 additional meters have accumulated since the last persisted
+   bike file, when an alert fires, or when the ride ends.
 
 ## Validation Rules
 
@@ -111,4 +126,6 @@
 - Duplicate part names are valid; part lifecycle operations target the stable
   part identifier, not the part name.
 - User-entered ridden mileage accepts meters before validation and persistence.
+- User-entered target alert mileage is captured in kilometers in Edit Part and
+  stored internally in meters.
 - Part creation date display uses `DD.MM.YY` format in the part panel.

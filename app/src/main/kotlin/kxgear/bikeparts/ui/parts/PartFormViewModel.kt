@@ -19,7 +19,9 @@ data class PartFormUiState(
     val name: String = "",
     val riddenMileageInput: String = "",
     val createdDate: Long? = null,
-    val alertMileageInput: String = "",
+    val targetAlertMileageInput: String = "",
+    val curAlertMileage: Int = 0,
+    val targetAlertMileage: Int = 0,
     val alertText: String = "",
     val isAlertDialogVisible: Boolean = false,
     val isSaving: Boolean = false,
@@ -31,11 +33,7 @@ data class PartFormUiState(
         get() = partId != null
 
     val alertButtonLabel: String
-        get() =
-            alertMileageInput
-                .takeIf { it.isNotBlank() }
-                ?.let { "Alert every ${it.trim()}km" }
-                ?: "Alert disabled"
+        get() = "Alert ${curAlertMileage / 1000} / ${targetAlertMileage / 1000} km"
 }
 
 class PartFormViewModel(
@@ -68,7 +66,9 @@ class PartFormViewModel(
                 name = part.name,
                 riddenMileageInput = formatMetersAsKilometersValue(part.riddenMileage),
                 createdDate = part.createdDate,
-                alertMileageInput = part.alertMileage?.toString().orEmpty(),
+                targetAlertMileageInput = part.targetAlertMileage.takeIf { it > 0 }?.div(1000)?.toString().orEmpty(),
+                curAlertMileage = part.curAlertMileage,
+                targetAlertMileage = part.targetAlertMileage,
                 alertText = part.alertText.orEmpty(),
                 title = "Edit Part",
                 submitLabel = "Save",
@@ -94,8 +94,8 @@ class PartFormViewModel(
         _uiState.value = _uiState.value.copy(isAlertDialogVisible = false, errorMessage = null)
     }
 
-    fun updateAlertMileage(value: String) {
-        _uiState.value = _uiState.value.copy(alertMileageInput = value, errorMessage = null)
+    fun updateTargetAlertMileage(value: String) {
+        _uiState.value = _uiState.value.copy(targetAlertMileageInput = value, errorMessage = null)
     }
 
     fun updateAlertText(value: String) {
@@ -103,26 +103,40 @@ class PartFormViewModel(
     }
 
     suspend fun saveAlertConfig(): Boolean {
-        val alertMileageInput = _uiState.value.alertMileageInput.trim()
-        if (alertMileageInput.isEmpty()) {
-            _uiState.value = _uiState.value.copy(errorMessage = "Alert mileage is required")
+        val targetAlertMileageInput = _uiState.value.targetAlertMileageInput.trim()
+        if (targetAlertMileageInput.isEmpty()) {
+            _uiState.value = _uiState.value.copy(errorMessage = "Target alert mileage is required")
             return false
         }
-        val alertMileage = alertMileageInput.toIntOrNull()
-        if (alertMileage == null || alertMileage <= 0) {
+        val targetAlertMileage = targetAlertMileageInput.toIntOrNull()
+        if (targetAlertMileage == null || targetAlertMileage <= 0) {
             _uiState.value =
                 _uiState.value.copy(
-                    errorMessage = "Alert mileage must be a positive whole number in kilometers",
+                    errorMessage = "Target alert mileage must be a positive whole number in kilometers",
                 )
             return false
         }
-        _uiState.value = _uiState.value.copy(alertMileageInput = alertMileage.toString(), errorMessage = null)
-        return persistEditPart(alertMileage = alertMileage, alertText = _uiState.value.alertText.trim().ifBlank { null })
+        _uiState.value =
+            _uiState.value.copy(
+                targetAlertMileageInput = targetAlertMileage.toString(),
+                errorMessage = null,
+            )
+        return persistEditPart(
+            targetAlertMileage = targetAlertMileage,
+            alertText = _uiState.value.alertText.trim().ifBlank { null },
+            persistedCurAlertMileage = 0,
+            persistedTargetAlertMileage = targetAlertMileage * 1000,
+        )
     }
 
     suspend fun removeAlert(): Boolean {
-        _uiState.value = _uiState.value.copy(alertMileageInput = "", alertText = "", errorMessage = null)
-        return persistEditPart(alertMileage = null, alertText = null)
+        _uiState.value = _uiState.value.copy(targetAlertMileageInput = "", alertText = "", errorMessage = null)
+        return persistEditPart(
+            targetAlertMileage = null,
+            alertText = null,
+            persistedCurAlertMileage = 0,
+            persistedTargetAlertMileage = 0,
+        )
     }
 
     suspend fun submit(): Boolean {
@@ -165,7 +179,7 @@ class PartFormViewModel(
         }
 
         return persistEditPart(
-            alertMileage = _uiState.value.alertMileageInput.trim().toIntOrNull(),
+            targetAlertMileage = _uiState.value.targetAlertMileageInput.trim().toIntOrNull(),
             alertText = _uiState.value.alertText.trim().ifBlank { null },
             riddenMileage = riddenMileage,
             name = name,
@@ -174,11 +188,13 @@ class PartFormViewModel(
     }
 
     private suspend fun persistEditPart(
-        alertMileage: Int?,
+        targetAlertMileage: Int?,
         alertText: String?,
         riddenMileage: Int? = null,
         name: String? = null,
         closeAlertDialog: Boolean = true,
+        persistedCurAlertMileage: Int? = null,
+        persistedTargetAlertMileage: Int? = null,
     ): Boolean {
         if (mode != PartFormMode.EDIT) {
             return false
@@ -204,7 +220,7 @@ class PartFormViewModel(
                 partId = partId,
                 name = normalizedName,
                 riddenMileage = normalizedRiddenMileage,
-                alertMileage = alertMileage,
+                targetAlertMileage = targetAlertMileage,
                 alertText = alertText,
             )
         }.fold(
@@ -212,6 +228,8 @@ class PartFormViewModel(
                 _uiState.value =
                     _uiState.value.copy(
                         isSaving = false,
+                        curAlertMileage = persistedCurAlertMileage ?: _uiState.value.curAlertMileage,
+                        targetAlertMileage = persistedTargetAlertMileage ?: _uiState.value.targetAlertMileage,
                         isAlertDialogVisible = if (closeAlertDialog) false else _uiState.value.isAlertDialogVisible,
                         errorMessage = null,
                     )
