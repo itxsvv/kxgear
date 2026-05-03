@@ -35,25 +35,33 @@ class RideProcessingService(
     private val partAlertNotifier: PartAlertNotifier,
     private val logger: BikePartsLogger,
 ) : RideMetricProcessor {
-    private val pendingMetricsByBikeId = mutableMapOf<String, PendingRideMetric>()
+    private var cachedActiveBikeId: String? = null
+    private val cachedBikeFilesByBikeId = mutableMapOf<String, BikeFile>()
+    private val persistedBikeFilesByBikeId = mutableMapOf<String, BikeFile>()
 
     override suspend fun startNewRideSession() {
-        val activeBikeId = metadataRepository.read().activeBikeId
+        val activeBikeId = loadActiveBikeId()
         if (activeBikeId == null) {
             logger.debug("Ignoring ride session start because no active bike is selected")
             return
         }
 
-        pendingMetricsByBikeId.remove(activeBikeId)
         val bikeFile = bikeRepository.getBikeFile(activeBikeId)
         if (bikeFile == null) {
             logger.warn("Ignoring ride session start because active bike file is missing: $activeBikeId")
+            clearBikeCache(activeBikeId)
             return
         }
 
         if (bikeFile.rideCursor != RideCursor()) {
-            bikeRepository.saveBikeFile(bikeFile.copy(rideCursor = RideCursor()))
+            val reset = bikeFile.copy(rideCursor = RideCursor())
+            bikeRepository.saveBikeFile(reset)
+            cachedBikeFilesByBikeId[activeBikeId] = reset
+            persistedBikeFilesByBikeId[activeBikeId] = reset
             logger.debug("Started new ride session for $activeBikeId")
+        } else {
+            cachedBikeFilesByBikeId[activeBikeId] = bikeFile
+            persistedBikeFilesByBikeId[activeBikeId] = bikeFile
         }
     }
 
@@ -61,25 +69,23 @@ class RideProcessingService(
         metricValue: Int,
         recordedAt: Long,
     ): RideProcessingResult {
-        val metadata = metadataRepository.read()
-        val activeBikeId = metadata.activeBikeId
+        val activeBikeId = loadActiveBikeId()
         if (activeBikeId == null) {
             logger.debug("Ignoring ride metric because no active bike is selected")
             return RideProcessingResult.NoActiveBike
         }
 
-        val bikeFile = bikeRepository.getBikeFile(activeBikeId)
+        val bikeFile = loadBikeFile(activeBikeId)
         if (bikeFile == null) {
             logger.warn("Ignoring ride metric because active bike file is missing: $activeBikeId")
+            clearBikeCache(activeBikeId)
             return RideProcessingResult.ActiveBikeMissing
         }
 
         return try {
-            val pendingMetric = pendingMetricsByBikeId[activeBikeId]
-            val lastSeenMetricValue = pendingMetric?.metricValue ?: bikeFile.rideCursor.lastAcceptedMetricValue
             val deltaSinceLastSeen =
                 bikePartsService.deriveRideDelta(
-                    lastAccepted = lastSeenMetricValue,
+                    lastAccepted = bikeFile.rideCursor.lastAcceptedMetricValue,
                     incoming = metricValue,
                 )
             if (deltaSinceLastSeen == 0) {
@@ -93,19 +99,19 @@ class RideProcessingService(
                     recordedAt = recordedAt,
                 )
             val updated = outcome.bikeFile
+            cachedBikeFilesByBikeId[activeBikeId] = updated
 
             val distanceSincePersisted =
                 bikePartsService.deriveRideDelta(
-                    lastAccepted = bikeFile.rideCursor.lastAcceptedMetricValue,
+                    lastAccepted = persistedBikeFilesByBikeId[activeBikeId]?.rideCursor?.lastAcceptedMetricValue,
                     incoming = metricValue,
                 )
             if (distanceSincePersisted < PERSISTENCE_DISTANCE_METERS && outcome.alerts.isEmpty()) {
-                pendingMetricsByBikeId[activeBikeId] = PendingRideMetric(metricValue, recordedAt)
                 return RideProcessingResult.Deferred(updated)
             }
 
             bikeRepository.saveBikeFile(updated)
-            pendingMetricsByBikeId.remove(activeBikeId)
+            persistedBikeFilesByBikeId[activeBikeId] = updated
             emitAlerts(updated, outcome.alerts)
             RideProcessingResult.Applied(updated)
         } catch (error: RepositoryError.Validation) {
@@ -115,31 +121,14 @@ class RideProcessingService(
     }
 
     override suspend fun flushPendingRideMetrics() {
-        val pendingMetrics = pendingMetricsByBikeId.toMap()
-        pendingMetricsByBikeId.clear()
-
-        pendingMetrics.forEach { (bikeId, pendingMetric) ->
-            val bikeFile = bikeRepository.getBikeFile(bikeId)
-            if (bikeFile == null) {
-                logger.warn("Dropping pending ride metric because bike file is missing: $bikeId")
+        cachedBikeFilesByBikeId.toMap().forEach { (bikeId, cachedBikeFile) ->
+            val persistedBikeFile = persistedBikeFilesByBikeId[bikeId]
+            if (persistedBikeFile == null || cachedBikeFile == persistedBikeFile) {
                 return@forEach
             }
 
-            try {
-                val outcome =
-                    bikePartsService.applyRideUpdate(
-                        bikeFile = bikeFile,
-                        metricValue = pendingMetric.metricValue,
-                        recordedAt = pendingMetric.recordedAt,
-                    )
-                val updated = outcome.bikeFile
-                if (updated != bikeFile) {
-                    bikeRepository.saveBikeFile(updated)
-                    emitAlerts(updated, outcome.alerts)
-                }
-            } catch (error: RepositoryError.Validation) {
-                logger.warn("Dropping invalid pending ride metric for $bikeId", error)
-            }
+            bikeRepository.saveBikeFile(cachedBikeFile)
+            persistedBikeFilesByBikeId[bikeId] = cachedBikeFile
         }
     }
 
@@ -158,10 +147,30 @@ class RideProcessingService(
         }
     }
 
-    private data class PendingRideMetric(
-        val metricValue: Int,
-        val recordedAt: Long,
-    )
+    private suspend fun loadBikeFile(bikeId: String): BikeFile? {
+        cachedBikeFilesByBikeId[bikeId]?.let { return it }
+
+        val bikeFile = bikeRepository.getBikeFile(bikeId) ?: return null
+        cachedBikeFilesByBikeId[bikeId] = bikeFile
+        persistedBikeFilesByBikeId[bikeId] = bikeFile
+        return bikeFile
+    }
+
+    private suspend fun loadActiveBikeId(): String? {
+        cachedActiveBikeId?.let { return it }
+
+        val activeBikeId = metadataRepository.read().activeBikeId
+        cachedActiveBikeId = activeBikeId
+        return activeBikeId
+    }
+
+    private fun clearBikeCache(bikeId: String) {
+        if (cachedActiveBikeId == bikeId) {
+            cachedActiveBikeId = null
+        }
+        cachedBikeFilesByBikeId.remove(bikeId)
+        persistedBikeFilesByBikeId.remove(bikeId)
+    }
 
     companion object {
         private const val PERSISTENCE_DISTANCE_METERS: Int = 100

@@ -32,6 +32,7 @@ class AppContainer(
         encodeDefaults = true
     }
     private val fileStore = AtomicJsonFileStore()
+    private val karooSystem = KarooSystemService(context)
 
     val logger = BikePartsLogger()
 
@@ -52,7 +53,7 @@ class AppContainer(
         )
 
     val bikePartsService = BikePartsService()
-    private val partAlertNotifier = AndroidPartAlertNotifier(context, logger)
+    private val partAlertNotifier = AndroidPartAlertNotifier(context, logger, karooSystem)
     val bikeLifecycleService =
         BikeLifecycleService(
             bikeRepository = bikeRepository,
@@ -73,7 +74,7 @@ class AppContainer(
             partAlertNotifier = partAlertNotifier,
             logger = logger,
         )
-    val karooRideAdapter = KarooRideAdapter(KarooSystemService(context), logger)
+    val karooRideAdapter = KarooRideAdapter(karooSystem, logger)
 
     fun createRideUpdateController(scope: CoroutineScope): RideUpdateController =
         RideUpdateController(
@@ -82,5 +83,4 @@ class AppContainer(
             logger = logger,
             scope = scope,
         )
-
 }

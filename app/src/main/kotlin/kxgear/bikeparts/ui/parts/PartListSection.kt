@@ -83,9 +83,9 @@ fun PartListSection(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             PartActionSlot(
-                                label = if (part.isArchived) null else "Edit",
+                                label = if (part.isArchived) null else "View",
                                 onClick = if (part.isArchived) null else ({ onEditPart(part.partId) }),
-                                enabled = canMutate,
+                                enabled = true,
                                 alignment = Alignment.CenterStart,
                                 modifier = Modifier.weight(1f),
                             )

@@ -125,7 +125,7 @@ class PartDetailsViewModelTest {
 
         assertEquals("250", viewModel.uiState.value.targetAlertMileageInput)
         assertEquals("Service cassette", viewModel.uiState.value.alertText)
-        assertEquals("Alert 50 / 250 km", viewModel.uiState.value.alertButtonLabel)
+        assertEquals("Alert 50.0 / 250 km", viewModel.uiState.value.alertButtonLabel)
     }
 
     @Test

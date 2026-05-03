@@ -37,7 +37,7 @@ data class PartFormUiState(
             if (targetAlertMileage <= 0) {
                 "Add Alert"
             } else {
-                "Alert ${curAlertMileage / 1000} / ${targetAlertMileage / 1000} km"
+                "Alert ${formatMetersAsKilometersValue(curAlertMileage)} / ${formatMetersAsKilometersValue(targetAlertMileage).removeSuffix(".0")} km"
             }
 }
 

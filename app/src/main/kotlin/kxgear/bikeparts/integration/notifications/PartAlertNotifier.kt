@@ -1,14 +1,14 @@
 package kxgear.bikeparts.integration.notifications
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
-import androidx.core.app.NotificationCompat
+import android.os.Handler
+import android.os.Looper
+import io.hammerhead.karooext.KarooSystemService
+import io.hammerhead.karooext.models.InRideAlert
+import io.hammerhead.karooext.models.PlayBeepPattern
 import kxgear.bikeparts.R
 import kxgear.bikeparts.integration.logging.BikePartsLogger
 import kxgear.bikeparts.ui.common.formatMetersAsKilometers
-import kotlin.math.absoluteValue
 
 interface PartAlertNotifier {
     fun showAlert(
@@ -23,24 +23,9 @@ interface PartAlertNotifier {
 class AndroidPartAlertNotifier(
     context: Context,
     private val logger: BikePartsLogger,
+    private val karooSystem: KarooSystemService? = null,
 ) : PartAlertNotifier {
-    private val appContext = context.applicationContext
-    private val notificationManager =
-        appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-    init {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            notificationManager.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
-                    "Part maintenance alerts",
-                    NotificationManager.IMPORTANCE_DEFAULT,
-                ).apply {
-                    description = "Recurring bike part maintenance distance alerts"
-                },
-            )
-        }
-    }
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun showAlert(
         bikeName: String,
@@ -52,35 +37,44 @@ class AndroidPartAlertNotifier(
         val contentText =
             alertText?.trim().takeUnless { it.isNullOrEmpty() }
                 ?: "$partName reached ${formatMetersAsKilometers(thresholdMeters)} on $bikeName"
-        val notification =
-            NotificationCompat.Builder(appContext, CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(partName)
-                .setContentText(contentText)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                .setAutoCancel(true)
-                .build()
 
-        runCatching {
-            notificationManager.notify(
-                notificationId(partName = partName, thresholdMeters = thresholdMeters, currentMileageMeters = currentMileageMeters),
-                notification,
-            )
-        }.onFailure { error ->
-            logger.warn("Unable to show part alert notification", error)
+        mainHandler.post {
+            runCatching {
+                karooSystem?.dispatch(
+                    InRideAlert(
+                        id = "part-alert-$partName-$thresholdMeters-$currentMileageMeters",
+                        icon = R.mipmap.ic_launcher,
+                        title = partName,
+                        detail = contentText,
+                        autoDismissMs = 30_000L,
+                        backgroundColor = android.R.color.holo_red_dark,
+                        textColor = android.R.color.white,
+                    ),
+                )
+            }.onFailure { error ->
+                logger.warn("Unable to show Karoo in-ride alert", error)
+            }
+
+            runCatching {
+                karooSystem?.beep(freq = 880, duration = 200, count = 1)
+            }.onFailure { error ->
+                logger.warn("Unable to play part alert beep", error)
+            }
         }
     }
+}
 
-    private fun notificationId(
-        partName: String,
-        thresholdMeters: Int,
-        currentMileageMeters: Int,
-    ): Int = "${partName}:${thresholdMeters}:${currentMileageMeters}".hashCode().absoluteValue
-
-    companion object {
-        private const val CHANNEL_ID = "part-maintenance-alerts"
+private fun KarooSystemService.beep(
+    freq: Int,
+    duration: Int,
+    count: Int,
+) {
+    val beepList = mutableListOf(PlayBeepPattern.Tone(freq, duration))
+    repeat(count - 1) {
+        beepList.add(PlayBeepPattern.Tone(0, 50))
+        beepList.add(PlayBeepPattern.Tone(freq, duration))
     }
+    dispatch(PlayBeepPattern(beepList))
 }
 
 class NoOpPartAlertNotifier : PartAlertNotifier {
