@@ -1,0 +1,19 @@
+{
+  "label": "kxgear",
+  "packageName": "kxgear.bikeparts",
+  "iconUrl": "https://github.com/itxsvv/kxgear/releases/latest/download/odometer.png",
+  "latestApkUrl": "https://github.com/itxsvv/kxgear/releases/latest/download/app-release.apk",
+  "latestVersionCode": 103,
+  "latestVersion": "1.0.3",
+  "developer": "https://github.com/itxsvv",
+  "description": "Automatic Bike Part Mileage Tracking for Hammerhead Karoo.",
+  "releaseNotes": "Release",
+  "screenshotUrls": [
+    "https://github.com/itxsvv/kxgear/releases/latest/download/scr0.png",
+    "https://github.com/itxsvv/kxgear/releases/latest/download/scr1.png",
+    "https://github.com/itxsvv/kxgear/releases/latest/download/scr2.png"
+  ],
+  "tags": [
+    "performance"
+  ]
+}
