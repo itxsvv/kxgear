@@ -8,7 +8,7 @@ import kotlinx.coroutines.cancel
 import kxgear.bikeparts.AppContainer
 import kxgear.bikeparts.integration.karoo.RideUpdateController
 
-class BikePartsExtension : KarooExtension("kxgear", "0.1.0") {
+class BikePartsExtension : KarooExtension("kxgear", "1.0.3") {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private lateinit var appContainer: AppContainer
     private lateinit var rideUpdateController: RideUpdateController

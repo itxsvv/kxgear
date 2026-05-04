@@ -197,6 +197,9 @@ class PartLifecycleService(
         val bikeFile = loadRequiredBikeFile(bikeId)
         val normalizedName = validatePartName(name)
         BikePartsValidators.requireWholeMileage(riddenMileage)
+        val replacedPart =
+            bikeFile.parts.firstOrNull { it.partId == oldPartId }
+                ?: throw RepositoryError.NotFound("Part not found: $oldPartId")
         val now = clock()
         val newPart =
             Part(
@@ -206,6 +209,9 @@ class PartLifecycleService(
                 status = PartStatus.INSTALLED,
                 createdAt = now,
                 createdDate = now,
+                curAlertMileage = 0,
+                targetAlertMileage = replacedPart.targetAlertMileage,
+                alertText = replacedPart.alertText,
                 updatedAt = now,
             )
 

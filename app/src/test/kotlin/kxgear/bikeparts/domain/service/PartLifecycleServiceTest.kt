@@ -152,6 +152,34 @@ class PartLifecycleServiceTest {
         assertEquals(PartStatus.ARCHIVED, details.archivedParts.single().status)
     }
 
+    @Test
+    fun replacePartTransfersAlertConfigurationAndResetsCurrentProgress() = runBlocking {
+        val repository =
+            InMemoryBikeRepository(
+                bikeFile(
+                    parts =
+                        listOf(
+                            part(
+                                partId = "part-1",
+                                name = "Chain",
+                                riddenMileage = 25,
+                                curAlertMileage = 4000,
+                                targetAlertMileage = 10000,
+                                alertText = "Service chain",
+                            ),
+                        ),
+                ),
+            )
+        val service = createService(repository)
+
+        val details = service.replacePart("bike-1", "part-1", "Chain", 0)
+
+        val replacement = details.installedParts.single()
+        assertEquals(0, replacement.curAlertMileage)
+        assertEquals(10000, replacement.targetAlertMileage)
+        assertEquals("Service chain", replacement.alertText)
+    }
+
     private fun createService(repository: InMemoryBikeRepository): PartLifecycleService =
         PartLifecycleService(
             bikeRepository = repository,

@@ -56,7 +56,7 @@ class AndroidPartAlertNotifier(
             }
 
             runCatching {
-                karooSystem?.beep(freq = 880, duration = 200, count = 1)
+                karooSystem?.beep(freq = 880, duration = 200, count = 3)
             }.onFailure { error ->
                 logger.warn("Unable to play part alert beep", error)
             }

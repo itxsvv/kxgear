@@ -111,6 +111,9 @@ class RideUpdateRepositoryTest {
                             name = "Chain",
                             riddenMileage = 50,
                             status = PartStatus.INSTALLED,
+                            curAlertMileage = 4000,
+                            targetAlertMileage = 10000,
+                            alertText = "Service chain",
                             createdAt = 1000L,
                             updatedAt = 1000L,
                         ),
@@ -144,6 +147,9 @@ class RideUpdateRepositoryTest {
         assertEquals(50, archived.currentMileage)
         assertEquals(PartStatus.INSTALLED, replacement.status)
         assertEquals(7, replacement.riddenMileage)
+        assertEquals(0, replacement.curAlertMileage)
+        assertEquals(10000, replacement.targetAlertMileage)
+        assertEquals("Service chain", replacement.alertText)
     }
 
     private fun bikeFile(
