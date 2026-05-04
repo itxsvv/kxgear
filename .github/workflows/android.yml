@@ -3,10 +3,10 @@ name: Build
 on:
   workflow_dispatch:
   push:
-    branches: [ "master" ]
+    branches: [ "buildtest" ]
     tags: [ "*" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "buildtest" ]
 
 jobs:
   build:
@@ -47,13 +47,7 @@ jobs:
         uses: ncipollo/release-action@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            app/build/outputs/apk/release/app-release.apk
-            app/manifest.json
-            app/odometer.png
-            scr0.png
-            scr1.png
-            scr2.png
+          artifacts: app/build/outputs/apk/release/app-release.apk,app/manifest.json,app/odometer.png,scr0.png,scr1.png,scr2.png
           name: ${{ github.ref_name }}
           prerelease: false
           draft: false
