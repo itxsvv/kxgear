@@ -5,8 +5,8 @@
 ### Local Bike Record
 
 - `bikeId`: local file identity used by kxgear routes and JSON storage
-- `karooBikeId`: legacy nullable field, not populated by current local bike
-  management
+- `karooBikeId`: nullable Karoo bike identity; persisted for bikes imported
+  from Karoo or matched to Karoo by name on startup, `null` for manual bikes
 - `name`: user-managed bike name
 - `karooMileageMeters`: bike mileage stored in meters
 - `createdAt`: local record creation time
@@ -16,7 +16,22 @@
 
 - One JSON file per local bike record.
 - Created, renamed, deleted, opened, and activated from the kxgear bike list.
+- Compared to Karoo bikes by name on app startup for optional import prompting
+  and `karooBikeId` backfill.
 - Mileage is stored in meters.
+
+### Karoo Bike Snapshot
+
+- `karooBikeId`
+- `name`
+- `odometerMeters`
+
+**Rules**
+
+- Loaded from the Karoo SDK once on app startup only.
+- Used only for name matching and startup auto-import.
+- Never persisted directly as its own file; accepted snapshots become local
+  bike records.
 
 ### Bike File
 
@@ -106,6 +121,9 @@
 4. Activate updates local metadata to point at the selected local bike.
 5. Loading the bike list rebuilds metadata from local bike files and clears
    stale active-bike references.
+6. On app startup, Karoo bike snapshots are compared to local bikes by name;
+   matches backfill `karooBikeId`, and unmatched snapshots are imported into
+   new local bike files automatically.
 
 ### Ride Processing
 
@@ -122,6 +140,8 @@
 
 - Bike names must be non-blank.
 - Bike mileage must be a non-negative whole number in meters.
+- Bikes imported from Karoo persist the source `karooBikeId`; bikes created
+  manually from Add Bike persist `karooBikeId = null`.
 - Duplicate or decreasing ride distance values must not mutate stored state.
 - Duplicate part names are valid; part lifecycle operations target the stable
   part identifier, not the part name.

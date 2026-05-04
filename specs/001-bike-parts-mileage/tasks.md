@@ -1,21 +1,22 @@
 # Tasks: Bike Parts Mileage Management
 
 **Input**: Design documents from `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/`
-**Prerequisites**: `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/plan.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/spec.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/research.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/data-model.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/contracts/karoo-ride-input-contract.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/contracts/json-storage-contract.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/quickstart.md`
+**Prerequisites**: `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/plan.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/spec.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/research.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/data-model.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/contracts/karoo-bike-sync-contract.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/contracts/karoo-ride-input-contract.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/contracts/json-storage-contract.md`, `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/quickstart.md`
 
 ## Phase 1: Local Bike Lifecycle
 
 - [X] Implement local bike add, edit, delete, view, and activate flows through
   `BikeLifecycleService`.
+- [X] Retrieve Karoo SDK bikes on app startup, compare them to local bikes by
+  name, and backfill `karooBikeId` on name matches.
+- [X] Automatically add startup-missing Karoo bikes and persist `karooBikeId`
+  for imported bikes while keeping manual bikes null.
 - [X] Render each bike list panel with name/mileage, View/Edit/Delete actions,
-  active state, and a full-width Add Bike button.
+  active state, and hide the Add Bike button in the current UI.
 - [X] Confirm the first locally added bike becomes active only when no active
   bike is already selected.
 - [X] Confirm deleting the active bike clears active selection and deleting an
   inactive bike preserves the current active bike.
-- [X] Remove runtime Karoo bike catalog sync wiring.
-- [X] Delete unused Karoo bike catalog adapter, controller, service, contract,
-  and tests.
 
 ## Phase 2: Parts
 

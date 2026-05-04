@@ -42,14 +42,14 @@ class MainActivity : ComponentActivity() {
 
                 fun returnToBikeList() {
                     scope.launch {
-                        bikeListViewModel.refresh()
+                        bikeListViewModel.refresh(syncKarooOnStartup = true)
                         screen = Screen.BikeList
                     }
                 }
 
                 LaunchedEffect(screen) {
                     if (screen == Screen.BikeList) {
-                        bikeListViewModel.refresh()
+                        bikeListViewModel.refresh(syncKarooOnStartup = true)
                     }
                 }
 
@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
                             if (event == Lifecycle.Event.ON_RESUME) {
                                 scope.launch {
                                     when (val activeScreen = screen) {
-                                        Screen.BikeList -> bikeListViewModel.refresh()
+                                        Screen.BikeList -> bikeListViewModel.refresh(syncKarooOnStartup = true)
                                         is Screen.BikeDetails -> activeScreen.bikeDetailsViewModel.loadBike(activeScreen.bikeId)
                                     }
                                 }
@@ -91,11 +91,6 @@ class MainActivity : ComponentActivity() {
                             onSelectBike = { bikeId ->
                                 scope.launch {
                                     bikeListViewModel.selectBike(bikeId)
-                                }
-                            },
-                            onAddBike = { name, mileageMeters ->
-                                scope.launch {
-                                    bikeListViewModel.addBike(name, mileageMeters)
                                 }
                             },
                             onUpdateBike = { bikeId, name, mileageMeters ->

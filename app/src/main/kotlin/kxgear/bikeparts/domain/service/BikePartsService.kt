@@ -155,7 +155,7 @@ class BikePartsService {
         val filtered = metadata.bikeIndex.filterNot { it.bikeId == bike.bikeId }
         return metadata.copy(
             bikeIndex =
-                (filtered + BikeSummary(bike.bikeId, bike.name, bike.karooMileageMeters))
+                (filtered + BikeSummary(bike.bikeId, bike.name, bike.karooMileageMeters, hasKarooBikeId = bike.karooBikeId != null))
                     .sortedBy { it.name.lowercase() },
         )
     }

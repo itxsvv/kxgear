@@ -9,6 +9,7 @@ data class BikeSummaryDto(
     val bikeId: String,
     val name: String,
     val mileageMeters: Int = 0,
+    val hasKarooBikeId: Boolean = false,
 )
 
 @Serializable
@@ -20,11 +21,11 @@ data class SharedMetadataDto(
 fun SharedMetadata.toDto(): SharedMetadataDto =
     SharedMetadataDto(
         activeBikeId = activeBikeId,
-        bikeIndex = bikeIndex.map { BikeSummaryDto(it.bikeId, it.name, it.mileageMeters) },
+        bikeIndex = bikeIndex.map { BikeSummaryDto(it.bikeId, it.name, it.mileageMeters, it.hasKarooBikeId) },
     )
 
 fun SharedMetadataDto.toDomain(): SharedMetadata =
     SharedMetadata(
         activeBikeId = activeBikeId,
-        bikeIndex = bikeIndex.map { BikeSummary(it.bikeId, it.name, it.mileageMeters) },
+        bikeIndex = bikeIndex.map { BikeSummary(it.bikeId, it.name, it.mileageMeters, it.hasKarooBikeId) },
     )

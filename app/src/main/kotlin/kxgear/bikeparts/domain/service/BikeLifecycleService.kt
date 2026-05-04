@@ -17,7 +17,7 @@ data class BikeOverview(
 )
 
 interface BikeLifecycleGateway {
-    suspend fun loadOverview(): BikeOverview
+    suspend fun loadOverview(syncKarooOnStartup: Boolean = false): BikeOverview
 
     suspend fun getBike(bikeId: String): Bike?
 
@@ -35,17 +35,25 @@ interface BikeLifecycleGateway {
     suspend fun deleteBike(bikeId: String): BikeOverview
 
     suspend fun selectActiveBike(bikeId: String): BikeOverview
+
+    suspend fun addBikesFromKaroo(bikes: List<KarooBikeSnapshot>): BikeOverview
 }
 
 class BikeLifecycleService(
     private val bikeRepository: BikeRepository,
     private val metadataRepository: MetadataRepository,
     private val logger: BikePartsLogger,
+    private val karooBikeCatalogGateway: KarooBikeCatalogGateway? = null,
     private val clock: () -> Long = System::currentTimeMillis,
     private val idProvider: () -> String = { UUID.randomUUID().toString() },
 ) : BikeLifecycleGateway {
-    override suspend fun loadOverview(): BikeOverview {
-        val bikeFiles = bikeRepository.listBikeFiles()
+    override suspend fun loadOverview(syncKarooOnStartup: Boolean): BikeOverview {
+        val bikeFiles =
+            if (syncKarooOnStartup) {
+                syncKarooBikes(bikeRepository.listBikeFiles())
+            } else {
+                bikeRepository.listBikeFiles()
+            }
         val metadata = metadataRepository.read()
         val normalized = normalizeMetadata(metadata, bikeFiles)
         if (normalized != metadata) {
@@ -72,6 +80,7 @@ class BikeLifecycleService(
         val bike =
             Bike(
                 bikeId = idProvider(),
+                karooBikeId = null,
                 name = normalizedName,
                 karooMileageMeters = mileageMeters,
                 createdAt = now,
@@ -160,6 +169,54 @@ class BikeLifecycleService(
         return BikeOverview(updatedMetadata.bikeIndex, updatedMetadata.activeBikeId)
     }
 
+    override suspend fun addBikesFromKaroo(bikes: List<KarooBikeSnapshot>): BikeOverview {
+        if (bikes.isEmpty()) {
+            return loadOverview()
+        }
+
+        val existingBikeFiles = bikeRepository.listBikeFiles().toMutableList()
+        val createdBikeIds = mutableListOf<String>()
+
+        bikes.forEach { karooBike ->
+            val normalizedName = requireBikeName(karooBike.name)
+            BikePartsValidators.requireWholeMileage(karooBike.mileageMeters)
+            BikePartsValidators.requireUniqueBikeName(existingBikeFiles.map { it.bike }, normalizedName)
+
+            val now = clock()
+            val bikeId = idProvider()
+            val bike =
+                Bike(
+                    bikeId = bikeId,
+                    karooBikeId = karooBike.karooBikeId,
+                    name = normalizedName,
+                    karooMileageMeters = karooBike.mileageMeters,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            val bikeFile =
+                BikeFile(
+                    bike = bike,
+                    parts = emptyList(),
+                    lastUpdatedAt = now,
+                )
+            bikeRepository.saveBikeFile(bikeFile)
+            existingBikeFiles += bikeFile
+            createdBikeIds += bikeId
+        }
+
+        val currentMetadata = metadataRepository.read()
+        val metadataWithActiveImport =
+            if (currentMetadata.activeBikeId == null && createdBikeIds.isNotEmpty()) {
+                currentMetadata.copy(activeBikeId = createdBikeIds.first())
+            } else {
+                currentMetadata
+            }
+        val updatedMetadata = normalizeMetadata(metadataWithActiveImport, bikeRepository.listBikeFiles())
+        metadataRepository.save(updatedMetadata)
+        logger.debug("Imported ${createdBikeIds.size} Karoo bikes into local catalog")
+        return BikeOverview(updatedMetadata.bikeIndex, updatedMetadata.activeBikeId)
+    }
+
     private fun requireBikeName(name: String): String {
         val normalized = name.trim()
         if (normalized.isBlank()) {
@@ -174,7 +231,7 @@ class BikeLifecycleService(
     ): SharedMetadata {
         val bikeIndex =
             bikeFiles
-                .map { BikeSummary(it.bike.bikeId, it.bike.name, it.bike.karooMileageMeters) }
+                .map { BikeSummary(it.bike.bikeId, it.bike.name, it.bike.karooMileageMeters, hasKarooBikeId = it.bike.karooBikeId != null) }
                 .sortedBy { it.name.lowercase() }
         val activeBikeId = metadata.activeBikeId?.takeIf { activeId -> bikeIndex.any { it.bikeId == activeId } }
         return metadata.copy(
@@ -182,4 +239,107 @@ class BikeLifecycleService(
             bikeIndex = bikeIndex,
         )
     }
+
+    private suspend fun syncKarooBikes(bikeFiles: List<BikeFile>): List<BikeFile> {
+        val gateway = karooBikeCatalogGateway ?: return bikeFiles
+        val karooBikes =
+            runCatching { gateway.listBikes() }
+                .onFailure { error -> logger.warn("Unable to load Karoo bikes on startup: ${error.message}") }
+                .getOrDefault(emptyList())
+        if (karooBikes.isEmpty()) {
+            return bikeFiles
+        }
+
+        val distinctKarooBikes = linkedMapOf<String, KarooBikeSnapshot>()
+        karooBikes.forEach { bike ->
+            distinctKarooBikes.putIfAbsent(normalizeBikeName(bike.name), bike)
+        }
+
+        val localByName = bikeFiles.associateBy { normalizeBikeName(it.bike.name) }.toMutableMap()
+        val updatedBikeFiles = bikeFiles.toMutableList()
+        val importedBikeIds = mutableListOf<String>()
+        val currentMetadata = metadataRepository.read()
+        val hadNoActiveBike = currentMetadata.activeBikeId == null
+
+        distinctKarooBikes.values.forEach { karooBike ->
+            val matchedLocalBike = localByName[normalizeBikeName(karooBike.name)]
+            if (matchedLocalBike == null) {
+                val now = clock()
+                val newBikeFile =
+                    BikeFile(
+                        bike =
+                            Bike(
+                                bikeId = idProvider(),
+                                karooBikeId = karooBike.karooBikeId,
+                                name = requireBikeName(karooBike.name),
+                                karooMileageMeters = karooBike.mileageMeters,
+                                createdAt = now,
+                                updatedAt = now,
+                            ),
+                        parts = emptyList(),
+                        lastUpdatedAt = now,
+                    )
+                bikeRepository.saveBikeFile(newBikeFile)
+                updatedBikeFiles += newBikeFile
+                localByName[normalizeBikeName(newBikeFile.bike.name)] = newBikeFile
+                importedBikeIds += newBikeFile.bike.bikeId
+                return@forEach
+            }
+            if (matchedLocalBike.bike.karooBikeId == karooBike.karooBikeId) {
+                return@forEach
+            }
+
+            val now = clock()
+            val updatedBikeFile =
+                matchedLocalBike.copy(
+                    bike =
+                        matchedLocalBike.bike.copy(
+                            karooBikeId = karooBike.karooBikeId,
+                            updatedAt = now,
+                        ),
+                    lastUpdatedAt = now,
+                )
+            bikeRepository.saveBikeFile(updatedBikeFile)
+            val index = updatedBikeFiles.indexOfFirst { it.bike.bikeId == updatedBikeFile.bike.bikeId }
+            if (index >= 0) {
+                updatedBikeFiles[index] = updatedBikeFile
+            }
+            localByName[normalizeBikeName(updatedBikeFile.bike.name)] = updatedBikeFile
+        }
+
+        updatedBikeFiles.toList().forEach { localBikeFile ->
+            val normalizedName = normalizeBikeName(localBikeFile.bike.name)
+            if (distinctKarooBikes.containsKey(normalizedName)) {
+                return@forEach
+            }
+            if (localBikeFile.bike.karooBikeId == null) {
+                return@forEach
+            }
+
+            val now = clock()
+            val clearedBikeFile =
+                localBikeFile.copy(
+                    bike =
+                        localBikeFile.bike.copy(
+                            karooBikeId = null,
+                            updatedAt = now,
+                        ),
+                    lastUpdatedAt = now,
+                )
+            bikeRepository.saveBikeFile(clearedBikeFile)
+            val index = updatedBikeFiles.indexOfFirst { it.bike.bikeId == clearedBikeFile.bike.bikeId }
+            if (index >= 0) {
+                updatedBikeFiles[index] = clearedBikeFile
+            }
+            localByName[normalizedName] = clearedBikeFile
+        }
+
+        if (hadNoActiveBike && importedBikeIds.isNotEmpty()) {
+            metadataRepository.save(currentMetadata.copy(activeBikeId = importedBikeIds.first()))
+        }
+
+        return updatedBikeFiles
+    }
+
+    private fun normalizeBikeName(name: String): String = name.trim().lowercase()
 }
