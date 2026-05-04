@@ -15,6 +15,7 @@ import kxgear.bikeparts.domain.service.BikeLifecycleService
 import kxgear.bikeparts.domain.service.BikePartsService
 import kxgear.bikeparts.domain.service.PartLifecycleService
 import kxgear.bikeparts.domain.service.RideProcessingService
+import kxgear.bikeparts.integration.karoo.KarooBikeCatalogAdapter
 import kxgear.bikeparts.integration.karoo.KarooRideAdapter
 import kxgear.bikeparts.integration.karoo.RideUpdateController
 import kxgear.bikeparts.integration.logging.BikePartsLogger
@@ -54,11 +55,13 @@ class AppContainer(
 
     val bikePartsService = BikePartsService()
     private val partAlertNotifier = AndroidPartAlertNotifier(context, logger, karooSystem)
+    private val karooBikeCatalogAdapter = KarooBikeCatalogAdapter(karooSystem, logger)
     val bikeLifecycleService =
         BikeLifecycleService(
             bikeRepository = bikeRepository,
             metadataRepository = metadataRepository,
             logger = logger,
+            karooBikeCatalogGateway = karooBikeCatalogAdapter,
         )
     val partLifecycleService =
         PartLifecycleService(

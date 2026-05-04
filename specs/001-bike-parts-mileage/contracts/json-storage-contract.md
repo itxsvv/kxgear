@@ -10,6 +10,7 @@ cursor data using JSON files only with one bike stored per file.
 - One JSON file per local bike record, e.g. `bikes/<bike-id>.json`
 - Each bike file contains:
   - local bike record identity
+  - optional `karooBikeId` for Karoo-synchronized bikes
   - bike name and mileage in meters
   - installed and archived parts
   - per-part `curAlertMileage`, `targetAlertMileage`, and optional alert text
@@ -26,6 +27,8 @@ cursor data using JSON files only with one bike stored per file.
 - Treat malformed JSON as a recoverable repository error, never as partial valid
   state.
 - Rebuild the visible bike index from local bike files.
+- Preserve `karooBikeId = null` for manual bikes and any stored non-null
+  `karooBikeId` for bikes imported from or matched to Karoo.
 
 ## Write Rules
 

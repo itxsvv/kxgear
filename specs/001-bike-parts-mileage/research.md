@@ -1,16 +1,48 @@
 # Research: Bike Parts Mileage Management
 
-## Decision: Manage bikes locally in kxgear
+## Decision: Manage bikes locally in kxgear with startup Karoo discovery
 
-- **Decision**: Do not observe or sync the Karoo bike catalog. Create, rename,
-  delete, view, and activate bikes from the kxgear bike list screen.
+- **Decision**: Keep local bike add, rename, delete, view, and activate flows
+  in kxgear, but on app startup read the Karoo SDK `Bikes` event once to find
+  missing bikes by name and add them automatically.
 - **Rationale**: The app needs predictable local part history and user-controlled
-  bike management independent from Karoo Settings.
+  bike management, but startup discovery can reduce duplicate data entry and
+  lets local bikes retain a persisted `karooBikeId`.
 - **Alternatives considered**:
-  - Use Karoo bike catalog events as the source of truth: rejected because bike
+  - Use the Karoo bike catalog as the source of truth: rejected because bike
     add/remove/rename behavior must be controlled from kxgear.
+  - Ignore the Karoo bike catalog entirely: rejected because the new
+    requirement explicitly needs startup discovery and import.
   - Infer bikes from ride-only signals: rejected because ride signals do not
     define the user's bike catalog.
+
+## Decision: Match startup bikes by name and backfill `karooBikeId`
+
+- **Decision**: Compare Karoo bikes and local bikes by bike name on startup;
+  when a name matches, store the Karoo bike ID on the existing local bike
+  instead of creating a duplicate add.
+- **Rationale**: The requirement defines bike name as the matching key, and
+  backfilling `karooBikeId` makes future local state aware of the Karoo
+  identity without changing local bike ownership.
+- **Alternatives considered**:
+  - Prompt for every Karoo bike regardless of name: rejected because it would
+    create duplicate local bikes for already-existing names.
+  - Match only by `karooBikeId`: rejected because manually created local bikes
+    start with `karooBikeId = null`.
+
+## Decision: Use the official Karoo `Bikes` event on startup
+
+- **Decision**: Fetch startup Karoo bikes from the official `Bikes` event
+  (`Bikes.Params`) and map each SDK bike to a local snapshot of bike ID, name,
+  and whole-meter odometer.
+- **Rationale**: The official `karoo-ext` docs expose `Bikes` as a supported
+  observable event whose `Bike` payload already includes `id`, `name`, and
+  `odometer`, which is exactly the startup-sync input shape needed here.
+- **Alternatives considered**:
+  - Reconstruct bikes from ride profiles or ride state: rejected because those
+    APIs do not represent the saved bike catalog.
+  - Keep a deleted custom adapter: rejected because a focused one-shot adapter
+    is enough for startup sync.
 
 ## Decision: Keep local active-bike selection
 

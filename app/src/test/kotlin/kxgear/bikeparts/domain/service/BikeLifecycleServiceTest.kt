@@ -34,6 +34,63 @@ class BikeLifecycleServiceTest {
     }
 
     @Test
+    fun loadOverviewStartupSyncBackfillsKarooBikeIdAndImportsMissingKarooBikes() = runBlocking {
+        val bikeRepository =
+            InMemoryBikeRepository(
+                bikeFile("bike-1", "Road"),
+            )
+        val metadataRepository = InMemoryMetadataRepository(SharedMetadata(activeBikeId = "bike-1"))
+        val karooGateway =
+            FakeKarooBikeCatalogGateway(
+                listOf(
+                    KarooBikeSnapshot("karoo-road", "Road", 1000),
+                    KarooBikeSnapshot("karoo-gravel", "Gravel", 2000),
+                ),
+            )
+        val service =
+            BikeLifecycleService(
+                bikeRepository = bikeRepository,
+                metadataRepository = metadataRepository,
+                logger = logger,
+                karooBikeCatalogGateway = karooGateway,
+                clock = { 3000L },
+            )
+
+        val overview = service.loadOverview(syncKarooOnStartup = true)
+
+        assertEquals(1, karooGateway.loadCount)
+        assertEquals("karoo-road", bikeRepository.getBikeFile("bike-1")?.bike?.karooBikeId)
+        assertEquals(listOf("Gravel", "Road"), overview.bikes.map { it.name })
+        assertEquals("karoo-gravel", bikeRepository.listBikeFiles().first { it.bike.name == "Gravel" }.bike.karooBikeId)
+        assertEquals("bike-1", overview.activeBikeId)
+    }
+
+    @Test
+    fun loadOverviewStartupSyncClearsKarooBikeIdWhenBikeMissingFromKarooList() = runBlocking {
+        val bikeRepository =
+            InMemoryBikeRepository(
+                bikeFile("bike-1", "Road", karooBikeId = "karoo-road"),
+            )
+        val metadataRepository = InMemoryMetadataRepository(SharedMetadata(activeBikeId = "bike-1"))
+        val karooGateway =
+            FakeKarooBikeCatalogGateway(
+                listOf(KarooBikeSnapshot("karoo-gravel", "Gravel", 2000)),
+            )
+        val service =
+            BikeLifecycleService(
+                bikeRepository = bikeRepository,
+                metadataRepository = metadataRepository,
+                logger = logger,
+                karooBikeCatalogGateway = karooGateway,
+                clock = { 3000L },
+            )
+
+        service.loadOverview(syncKarooOnStartup = true)
+
+        assertEquals(null, bikeRepository.getBikeFile("bike-1")?.bike?.karooBikeId)
+    }
+
+    @Test
     fun selectActiveBikeUpdatesMetadataForLocalBike() = runBlocking {
         val bikeRepository =
             InMemoryBikeRepository(
@@ -69,7 +126,31 @@ class BikeLifecycleServiceTest {
         assertEquals("bike-created", overview.activeBikeId)
         assertEquals("bike-created", metadataRepository.read().activeBikeId)
         assertEquals("Road", bikeRepository.getBikeFile("bike-created")?.bike?.name)
+        assertEquals(null, bikeRepository.getBikeFile("bike-created")?.bike?.karooBikeId)
         assertEquals(1234, bikeRepository.getBikeFile("bike-created")?.bike?.karooMileageMeters)
+    }
+
+    @Test
+    fun addBikesFromKarooPersistsKarooBikeIdAndSetsActiveWhenUnset() = runBlocking {
+        val bikeRepository = InMemoryBikeRepository()
+        val metadataRepository = InMemoryMetadataRepository()
+        val service =
+            BikeLifecycleService(
+                bikeRepository = bikeRepository,
+                metadataRepository = metadataRepository,
+                logger = logger,
+                clock = { 2000L },
+                idProvider = { "bike-imported" },
+            )
+
+        val overview =
+            service.addBikesFromKaroo(
+                listOf(KarooBikeSnapshot("karoo-1", "Road", 4321)),
+            )
+
+        assertEquals("bike-imported", overview.activeBikeId)
+        assertEquals("karoo-1", bikeRepository.getBikeFile("bike-imported")?.bike?.karooBikeId)
+        assertEquals(4321, bikeRepository.getBikeFile("bike-imported")?.bike?.karooMileageMeters)
     }
 
     @Test
@@ -158,6 +239,18 @@ class BikeLifecycleServiceTest {
 
         override suspend fun save(metadata: SharedMetadata) {
             this.metadata = metadata
+        }
+    }
+
+    private class FakeKarooBikeCatalogGateway(
+        private val bikes: List<KarooBikeSnapshot>,
+    ) : KarooBikeCatalogGateway {
+        var loadCount: Int = 0
+            private set
+
+        override suspend fun listBikes(): List<KarooBikeSnapshot> {
+            loadCount += 1
+            return bikes
         }
     }
 }

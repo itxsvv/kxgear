@@ -5,6 +5,7 @@ import kxgear.bikeparts.domain.model.Bike
 import kxgear.bikeparts.domain.model.BikeSummary
 import kxgear.bikeparts.domain.service.BikeLifecycleGateway
 import kxgear.bikeparts.domain.service.BikeOverview
+import kxgear.bikeparts.domain.service.KarooBikeSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -26,6 +27,42 @@ class BikeListViewModelTest {
 
         assertEquals(2, viewModel.uiState.value.bikes.size)
         assertEquals("bike-2", viewModel.uiState.value.bikes.first { it.isActive }.bikeId)
+        assertEquals(listOf(true, true), viewModel.uiState.value.bikes.map { it.canDelete })
+    }
+
+    @Test
+    fun refreshDisablesDeleteForKarooSyncedBike() = runBlocking {
+        val gateway =
+            FakeBikeLifecycleGateway(
+                overview =
+                    BikeOverview(
+                        bikes = listOf(BikeSummary("bike-1", "Road", hasKarooBikeId = true)),
+                        activeBikeId = null,
+                    ),
+            )
+        val viewModel = BikeListViewModel(gateway)
+
+        viewModel.refresh()
+
+        assertEquals(false, viewModel.uiState.value.bikes.single().canDelete)
+    }
+
+    @Test
+    fun refreshStartupSyncMapsImportedBikes() = runBlocking {
+        val gateway =
+            FakeBikeLifecycleGateway(
+                overview =
+                    BikeOverview(
+                        bikes = listOf(BikeSummary("bike-1", "Road", 1200)),
+                        activeBikeId = null,
+                    ),
+            )
+        val viewModel = BikeListViewModel(gateway)
+
+        viewModel.refresh(syncKarooOnStartup = true)
+
+        assertEquals(true, gateway.loadOverviewCalls.single())
+        assertEquals(listOf("Road"), viewModel.uiState.value.bikes.map { it.name })
     }
 
     @Test
@@ -85,8 +122,12 @@ class BikeListViewModelTest {
             private set
         var deletedBikeId: String? = null
             private set
+        val loadOverviewCalls = mutableListOf<Boolean>()
 
-        override suspend fun loadOverview(): BikeOverview = state
+        override suspend fun loadOverview(syncKarooOnStartup: Boolean): BikeOverview {
+            loadOverviewCalls += syncKarooOnStartup
+            return state
+        }
 
         override suspend fun getBike(bikeId: String): Bike? = bikes[bikeId] ?: fallbackBike
 
@@ -129,6 +170,10 @@ class BikeListViewModelTest {
         override suspend fun selectActiveBike(bikeId: String): BikeOverview {
             selectedBikeId = bikeId
             state = state.copy(activeBikeId = bikeId)
+            return state
+        }
+
+        override suspend fun addBikesFromKaroo(bikes: List<KarooBikeSnapshot>): BikeOverview {
             return state
         }
     }

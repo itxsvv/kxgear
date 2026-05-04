@@ -39,13 +39,11 @@ fun BikeListScreen(
     canMutate: Boolean,
     onOpenBike: (String) -> Unit,
     onSelectBike: (String) -> Unit,
-    onAddBike: (String, Int) -> Unit,
     onUpdateBike: (String, String, Int) -> Unit,
     onDeleteBike: (String) -> Unit,
 ) {
     var bikeDialog by remember { mutableStateOf<BikeEditDialogState?>(null) }
     var pendingDeleteBike by remember { mutableStateOf<BikeListItemUiModel?>(null) }
-    val contentReady = state.bikes.isNotEmpty() || !state.isLoading
 
     Scaffold(
         topBar = {
@@ -86,15 +84,6 @@ fun BikeListScreen(
                     EmptyBikeList(modifier = Modifier.weight(1f))
                 }
             }
-            if (contentReady) {
-                Button(
-                    onClick = { bikeDialog = BikeEditDialogState.Add },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = canMutate,
-                ) {
-                    Text("Add Bike")
-                }
-            }
         }
     }
 
@@ -105,7 +94,6 @@ fun BikeListScreen(
             onDismiss = { bikeDialog = null },
             onSave = { name, mileageMeters ->
                 when (dialogState) {
-                    BikeEditDialogState.Add -> onAddBike(name, mileageMeters)
                     is BikeEditDialogState.Edit -> onUpdateBike(dialogState.bikeId, name, mileageMeters)
                 }
                 bikeDialog = null
@@ -140,7 +128,7 @@ private fun EmptyBikeList(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = "Add a bike to start tracking parts.",
+            text = "No synchronized bikes found.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -214,7 +202,7 @@ private fun BikeRow(
                 BikeActionSlot(
                     label = "Delete",
                     onClick = { onDeleteBike(bike.bikeId) },
-                    enabled = canMutate,
+                    enabled = canMutate && bike.canDelete,
                     alignment = Alignment.CenterEnd,
                     modifier = Modifier.weight(1f),
                 )
@@ -230,7 +218,7 @@ private fun BikeRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    Button(
+                    androidx.compose.material3.Button(
                         onClick = { onSelectBike(bike.bikeId) },
                         enabled = canMutate,
                     ) {
@@ -266,8 +254,6 @@ private fun BikeActionSlot(
 }
 
 private sealed interface BikeEditDialogState {
-    data object Add : BikeEditDialogState
-
     data class Edit(
         val bikeId: String,
         val currentName: String,
@@ -285,7 +271,6 @@ private fun BikeEditDialog(
     var name by remember(state) {
         mutableStateOf(
             when (state) {
-                BikeEditDialogState.Add -> ""
                 is BikeEditDialogState.Edit -> state.currentName
             },
         )
@@ -293,17 +278,12 @@ private fun BikeEditDialog(
     var mileageInput by remember(state) {
         mutableStateOf(
             when (state) {
-                BikeEditDialogState.Add -> ""
                 is BikeEditDialogState.Edit -> formatMetersAsKilometersValue(state.currentMileageMeters)
             },
         )
     }
     var errorMessage by remember(state) { mutableStateOf<String?>(null) }
-    val title =
-        when (state) {
-            BikeEditDialogState.Add -> "Add Bike"
-            is BikeEditDialogState.Edit -> "Edit Bike"
-        }
+    val title = "Edit Bike"
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -320,7 +300,7 @@ private fun BikeEditDialog(
                     },
                     label = { Text("Bike name") },
                     singleLine = true,
-                    enabled = canMutate,
+                    enabled = false,
                 )
                 OutlinedTextField(
                     value = mileageInput,

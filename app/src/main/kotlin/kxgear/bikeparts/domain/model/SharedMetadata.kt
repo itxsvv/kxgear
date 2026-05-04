@@ -4,6 +4,7 @@ data class BikeSummary(
     val bikeId: String,
     val name: String,
     val mileageMeters: Int = 0,
+    val hasKarooBikeId: Boolean = false,
 )
 
 data class SharedMetadata(

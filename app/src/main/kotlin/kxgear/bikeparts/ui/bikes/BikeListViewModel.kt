@@ -11,6 +11,7 @@ data class BikeListItemUiModel(
     val name: String,
     val mileageMeters: Int,
     val isActive: Boolean,
+    val canDelete: Boolean,
 )
 
 data class BikeListUiState(
@@ -25,10 +26,10 @@ class BikeListViewModel(
     private val _uiState = MutableStateFlow(BikeListUiState(isLoading = true))
     val uiState: StateFlow<BikeListUiState> = _uiState.asStateFlow()
 
-    suspend fun refresh() {
+    suspend fun refresh(syncKarooOnStartup: Boolean = false) {
         _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
         runCatching {
-            bikeLifecycleGateway.loadOverview()
+            bikeLifecycleGateway.loadOverview(syncKarooOnStartup)
         }.onSuccess { overview ->
             _uiState.value =
                 BikeListUiState(
@@ -39,6 +40,7 @@ class BikeListViewModel(
                                 name = bike.name,
                                 mileageMeters = bike.mileageMeters,
                                 isActive = bike.bikeId == overview.activeBikeId,
+                                canDelete = !bike.hasKarooBikeId,
                             )
                         },
                 )

@@ -21,8 +21,11 @@
   baseline so the new ride can begin from zero without being rejected as a
   decreasing value.
 - Q: Who manages bike existence and names? → A: kxgear manages bikes locally
-  from the bike list screen. Karoo bike catalog sync is not used for adding,
-  removing, renaming, or listing bikes.
+  from the bike list screen. On app startup, kxgear reads the Karoo SDK bike
+  list and automatically adds missing bikes by name; startup sync does not
+  automatically remove, rename, list-order, or activate existing bikes except
+  when the first imported bike must become active because no local bike was
+  selected.
 - Q: What does the bike list show? → A: Each bike appears as a panel with bike
   name on the left and bike mileage on the right, View Bike/Edit/Delete actions
   on the second row, and Activate or Active status on the third row. A full
@@ -64,32 +67,43 @@
 
 ### User Story 1 - Manage Local Bikes in kxgear (Priority: P1)
 
-As a cyclist, I can add, rename, delete, open, and activate bikes directly from
-the kxgear bike list so I can manage the bike catalog without changing Karoo
-settings.
+As a cyclist, I can open, rename, delete, and activate locally stored bikes,
+and on startup kxgear automatically imports missing bikes from the Karoo SDK,
+so the local bike catalog stays aligned with Karoo without manual duplication.
 
 **Why this priority**: The app cannot manage parts correctly unless its bike
 catalog can be created and maintained locally.
 
 **Independent Test**: Can be fully tested by starting with an empty local bike
-catalog, adding two bikes from the bike list, renaming one, deleting one, and
-activating the remaining bike.
+catalog, loading a Karoo SDK bike list on app startup, confirming the missing
+bikes appear automatically, then renaming, deleting, and activating bikes from
+the bike list.
 
 **Acceptance Scenarios**:
 
-1. **Given** the bike list is empty, **When** the user taps Add Bike and saves a
-   valid bike name, **Then** kxgear creates a local bike record and shows it in
-   the bike list.
-2. **Given** a bike exists, **When** the user taps Edit and saves a new valid
+1. **Given** the Karoo SDK returns bikes whose names do not exist in the local
+   bike list, **When** the app starts and the bike list first loads, **Then**
+   kxgear automatically creates local bike records for those missing bikes and
+   persists each associated `karooBikeId`.
+3. **Given** a local bike name already matches a bike returned by the Karoo
+   SDK, **When** startup sync runs, **Then** kxgear keeps the existing local
+   bike, stores the matched `karooBikeId`, and does not prompt to add a
+   duplicate bike.
+4. **Given** the Karoo SDK returns no bikes, **When** the app starts, **Then**
+   the local bike list remains unchanged.
+5. **Given** a bike is created manually through local bike lifecycle logic,
+   **When** it is saved, **Then** kxgear stores that bike with
+   `karooBikeId = null`.
+6. **Given** a bike exists, **When** the user taps Edit and saves a new valid
    name, **Then** the bike is renamed without changing its parts or ride
    history.
-3. **Given** a bike exists, **When** the user taps Delete, **Then** the bike is
+7. **Given** a bike exists, **When** the user taps Delete, **Then** the bike is
    removed from the visible list and cannot receive future ride updates.
-4. **Given** a bike is not active, **When** the user taps Activate, **Then** the
+8. **Given** a bike is not active, **When** the user taps Activate, **Then** the
    bike becomes the active bike for ride processing.
-5. **Given** a bike is active, **When** the list is shown, **Then** its third
+9. **Given** a bike is active, **When** the list is shown, **Then** its third
    row shows "Active" instead of an Activate button.
-6. **Given** at least one bike exists, **When** the bike list is shown, **Then**
+10. **Given** at least one bike exists, **When** the bike list is shown, **Then**
    each bike panel shows name and bike mileage on the first row, View
    Bike/Edit/Delete actions on the second row, and active state on the third
    row.
@@ -207,7 +221,12 @@ mutating actions are disabled outside idle.
 ### Edge Cases
 
 - What happens when there are no bikes? kxgear shows an empty state and keeps
-  the full-width Add Bike button available.
+  the bike list empty state visible.
+- What happens when the Karoo SDK returns no bikes on startup? kxgear leaves
+  the local bike list unchanged and does not show an import prompt.
+- What happens when a local bike name already matches a Karoo SDK bike name on
+  startup? kxgear stores the matched `karooBikeId` on the existing local bike
+  and does not prompt to add a duplicate bike.
 - What happens when the first bike is added and no active bike is selected?
   kxgear sets the new bike as active.
 - What happens when a non-active bike is deleted? kxgear removes that bike and
@@ -254,9 +273,24 @@ mutating actions are disabled outside idle.
 ### Functional Requirements
 
 - **FR-001**: The system MUST load the local bike catalog from persisted bike
-  files when kxgear starts.
-- **FR-002**: The system MUST NOT use the Karoo bike catalog to create, remove,
-  rename, list, or activate bikes.
+  files and retrieve the Karoo SDK bike list when kxgear starts.
+- **FR-002**: The system MUST compare the Karoo SDK bike list with the local
+  bike list on app startup using bike names as the matching key.
+- **FR-002a**: If a Karoo SDK bike name is missing from the local bike list on
+  startup, the system MUST create a local bike record for that bike and persist
+  the associated `karooBikeId`.
+- **FR-002c**: If a local bike name already matches a Karoo SDK bike name on
+  startup, the system MUST persist the matched `karooBikeId` on the existing
+  local bike and MUST NOT create a duplicate local bike.
+- **FR-002c1**: If a saved local bike is not present in the current Karoo SDK
+  bike list on startup, the system MUST clear that local bike's `karooBikeId`
+  to `null`.
+- **FR-002d**: Bikes created manually from the bike list MUST persist
+  `karooBikeId = null`.
+- **FR-002e**: If the Karoo SDK returns no bikes on startup, the system MUST
+  keep the local bike list and active-bike selection unchanged.
+- **FR-002f**: Karoo SDK startup sync MUST NOT automatically remove, rename, or
+  activate local bikes.
 - **FR-003**: The system MUST allow users to add bikes from the bike list
   screen.
 - **FR-004**: The system MUST allow users to rename bikes from the bike list
@@ -273,6 +307,9 @@ mutating actions are disabled outside idle.
   as the active bike for ride processing.
 - **FR-009a**: When no active bike is selected and the user adds a bike, the
   system MUST set the newly added bike as active.
+- **FR-009d**: When no active bike is selected and the user imports missing
+  bikes from the Karoo startup prompt, the first newly created local bike MUST
+  become active.
 - **FR-009b**: When the active bike is deleted, the system MUST clear the active
   bike selection.
 - **FR-009c**: When a non-active bike is deleted, the system MUST keep the
@@ -349,7 +386,8 @@ mutating actions are disabled outside idle.
 - **FR-017**: The bike list MUST render Activate for inactive bikes and Active
   text for the active bike in each bike panel's third row.
 - **FR-018**: The bike list MUST render a full-width Add Bike button at the
-  bottom of the list.
+  bottom of the list. [superseded]
+- **FR-018a**: The bike list UI MUST NOT render an Add Bike button.
 - **FR-019**: The system MUST derive a UI mutation gate from Karoo ride state.
 - **FR-020**: The system MUST enable bike and part mutating actions only when
   ride state is idle.
@@ -369,6 +407,9 @@ mutating actions are disabled outside idle.
   the same local bike files are loaded multiple times.
 - Local bike state MUST preserve part history and ride cursor data whenever a
   local bike is renamed or activated.
+- Startup Karoo bike sync MUST remain clearly separated from ongoing local bike
+  lifecycle actions and MUST NOT become the source of truth for local bike
+  deletion, rename, or activation.
 - Ride distance processing MUST remain testable in isolation from Karoo source
   types.
 - Ride distance processing MUST distinguish ride-session boundaries from
@@ -383,7 +424,11 @@ mutating actions are disabled outside idle.
 ### Key Entities *(include if feature involves data)*
 
 - **Local Bike Record**: The persisted bike file used by kxgear to store bike
-  name, bike mileage, part history, and ride cursor data.
+  name, optional `karooBikeId`, bike mileage, part history, and ride cursor
+  data.
+- **Karoo Bike Snapshot**: The startup-only Karoo SDK bike payload containing a
+  Karoo bike identifier, bike name, and odometer value used for name matching
+  and optional local-bike import prompts.
 - **Part**: An installed or archived maintenance item whose current mileage is
   derived from ridden mileage and that also stores its creation date,
   `curAlertMileage`, `targetAlertMileage`, and optional alert text.
@@ -405,6 +450,13 @@ mutating actions are disabled outside idle.
 
 - **SC-001**: 100% of bikes added from the bike list become visible without an
   app restart.
+- **SC-001a**: In 100% of startups where the Karoo SDK returns bikes missing
+  from the local list, those bikes are added automatically without duplicate
+  local records.
+- **SC-001b**: In 100% of bikes added from the Karoo startup prompt, the local
+  bike record persists the associated `karooBikeId`.
+- **SC-001c**: In 100% of bikes created manually from the bike list, the local
+  bike record persists `karooBikeId = null`.
 - **SC-002**: 100% of bike renames preserve that bike's parts and ride history.
 - **SC-003**: 100% of deleted bikes are removed from the visible list and, if
   active, no longer remain selected as active.
@@ -439,10 +491,13 @@ mutating actions are disabled outside idle.
 
 ## Assumptions
 
-- Karoo remains the source of ride distance events, but not the source of the
-  bike catalog.
+ - Karoo remains the source of ride distance events and a startup-only source of
+  bike-discovery suggestions, but ongoing bike lifecycle management remains
+  local to kxgear.
 - Local active-bike selection remains part of kxgear.
 - Bike deletion is a local delete action for the selected bike record.
 - Karoo ride distance is cumulative for the currently recording ride and may
   restart from zero on the next recording ride.
 - Idle is the only ride state that permits bike or part mutations from the UI.
+- Karoo bike names are sufficiently stable to use as the startup matching key
+  for existing local bikes.

@@ -6,10 +6,10 @@
 ## Summary
 
 Keep local bike and part management, and extend part records with a persisted
-creation date and optional recurring maintenance alert configuration. Alert
-settings are managed from Edit Part, stored per part, and used to trigger
-Android notifications whenever ridden mileage crosses recurring alert
-thresholds.
+creation date and optional recurring maintenance alert configuration. On app
+startup, also read the Karoo SDK bike catalog once, compare it to local bikes
+by name, automatically add missing Karoo bikes, and persist `karooBikeId` for
+imported or matched bikes while keeping manual bikes null.
 
 ## Technical Context
 
@@ -20,7 +20,7 @@ thresholds.
 **Target Platform**: Android 28+ on Karoo-supported devices
 **Project Type**: Single Android application + Karoo extension
 **Performance Goals**: Local bike and part updates should appear during app runtime without restart; ride persistence writes occur every 100 meters or when recording ends; part creation dates must be available immediately after Add Part and Replace Part saves; maintenance alerts must be emitted when threshold crossings are detected during ride processing
-**Constraints**: Karoo bike catalog sync is not used; one JSON file per bike; preserve local part history during rename and activation; delete removes the local bike record; no SQL storage; persist mileage in meters and display mileage in meters; parts persist a creation-date timestamp and optional alert settings; alert mileage is configured in kilometers while internal ride and part mileage remain meter-based; alert processing must treat skipped exact thresholds as valid crossings and emit only one alert for the highest threshold crossed by a single mileage update; Android alerts must be visible while kxgear is backgrounded and another app is active; process ride distance only during recording and reset the ride-distance baseline when a new recording ride starts; keeping the Karoo distance stream subscribed while idle or paused is acceptable if ignored events do not mutate mileage or trigger disk writes; bike and part mutations are UI-enabled only while ride state is idle, while View Bike and Back remain enabled
+**Constraints**: Read the Karoo bike catalog only on app startup for missing-bike auto-import and `karooBikeId` backfill; keep local bikes as the source of truth for add/remove/rename/activate; one JSON file per bike; preserve local part history during rename and activation; delete removes the local bike record; no SQL storage; persist mileage in meters and display mileage in meters; parts persist a creation-date timestamp and optional alert settings; alert mileage is configured in kilometers while internal ride and part mileage remain meter-based; alert processing must treat skipped exact thresholds as valid crossings and emit only one alert for the highest threshold crossed by a single mileage update; Android alerts must be visible while kxgear is backgrounded and another app is active; process ride distance only during recording and reset the ride-distance baseline when a new recording ride starts; keeping the Karoo distance stream subscribed while idle or paused is acceptable if ignored events do not mutate mileage or trigger disk writes; bike and part mutations are UI-enabled only while ride state is idle, while View Bike and Back remain enabled; hide Add Bike in the current UI while keeping manual add logic available in code
 **Scale/Scope**: Single-user, device-local bike and part catalog with low bike counts and frequent ride distance events
 
 ## Constitution Check
@@ -54,6 +54,7 @@ specs/001-bike-parts-mileage/
 ├── data-model.md
 ├── quickstart.md
 └── contracts/
+    ├── karoo-bike-sync-contract.md
     ├── karoo-ride-input-contract.md
     └── json-storage-contract.md
 ```
@@ -82,17 +83,21 @@ part list UI with a small formatter helper.
 ## Phase 0: Research
 
 See `/Users/itx/Projects/Karoo/kxgear/specs/001-bike-parts-mileage/research.md`
-for prior ride-processing decisions. No new external research is required for
-part creation dates and recurring alert behavior because the change stays within
-existing Kotlin, Compose, Android notification, and JSON patterns.
+for ride-processing and startup Karoo bike-sync decisions, including the
+official `Bikes` Karoo event, one-shot startup retrieval, and name-based local
+matching.
 
 ## Phase 1: Design & Contracts
 
 ### Data Model Changes
 
 - Keep `Bike` as the local bike record with local display name and stored bike
-  mileage.
+  mileage, and persist nullable `karooBikeId`.
+- Treat `karooBikeId` as null for manual bikes and populated for bikes imported
+  from Karoo or matched to Karoo by name on startup.
 - Keep one `BikeFile` per local bike record with parts and ride cursor.
+- Add a startup-only `KarooBikeSnapshot` model carrying Karoo bike ID, name,
+  and odometer meters for matching and prompting.
 - Allow multiple parts in the same bike file to share the same display name;
   part identity remains based on the part record identifier.
 - Add `createdDate` to each part and set it when a part is created from Add
@@ -114,6 +119,8 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
   `Alert curAlertMileage km / targetAlertMileage km`, and configure alerts from
   a dialog with alert text, target alert mileage, and Remove alert action.
 - Keep `SharedMetadata` as the local active-bike and local bike index only.
+- Do not persist any startup-sync UI state; startup sync auto-imports missing
+  Karoo bikes during the first bike-list load.
 
 ### Integration Contracts
 
@@ -121,6 +128,10 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
   a local bike file, Edit renames the local bike, Delete removes the local bike
   file and clears active selection when needed, View Bike opens the bike, and
   Activate updates active selection.
+- Add a Karoo bike sync contract: on app startup, fetch `Bikes` from the Karoo
+  SDK once, compare by bike name to local bikes, backfill `karooBikeId` on
+  name matches, clear stale `karooBikeId` values when a saved bike is absent
+  from Karoo, and automatically import unmatched Karoo bikes.
 - Extend the local part UI contract so Edit Part exposes the persisted creation
   date separately from mutable ridden mileage and alert configuration.
 - Add a part alert contract: Edit Part can create, update, or remove alert
@@ -141,8 +152,8 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
   this is acceptable only because non-recording events are filtered before
   domain processing and persistence.
 - Update JSON contract for locally managed bikes and preserved local part
-  files, including `createdDate`, `curAlertMileage`, `targetAlertMileage`, and
-  alert text.
+  files, including nullable `karooBikeId`, `createdDate`,
+  `curAlertMileage`, `targetAlertMileage`, and alert text.
 
 ### Agent Context Update
 
@@ -151,23 +162,32 @@ existing Kotlin, Compose, Android notification, and JSON patterns.
 
 ## Phase 2: Implementation Strategy
 
-1. Extend the `Part` domain model and serialized DTO with persisted
+1. Add a Karoo bike catalog adapter that fetches the startup `Bikes` payload,
+   maps SDK odometer values into whole-meter snapshots, and fails closed to an
+   empty suggestion list when the Karoo service is unavailable.
+2. Extend bike lifecycle loading so startup sync compares local bikes and Karoo
+   bikes by name, backfills `karooBikeId` on matches, and automatically creates
+   local bikes for unmatched Karoo bikes.
+3. Remove the Add Bike control from the current bike-list UI while leaving the
+   existing manual add logic in the service and view-model layers.
+4. Extend the `Part` domain model and serialized DTO with persisted
    `createdDate`, `curAlertMileage`, `targetAlertMileage`, and `alertText`.
-2. On Add Part and Replace Part, assign `createdDate` from the current clock
+5. On Add Part and Replace Part, assign `createdDate` from the current clock
    time at the same moment the new part record is created.
-3. Preserve existing `createdDate` values when editing, archiving, deleting,
+6. Preserve existing `createdDate` values when editing, archiving, deleting,
    or applying ride mileage updates to a part.
-4. Add legacy load behavior so older persisted parts without `createdDate`
+7. Add legacy load behavior so older persisted parts without `createdDate`
    reuse `createdAt`.
-5. Add Edit Part UI state and dialog behavior for alert configuration,
+8. Add Edit Part UI state and dialog behavior for alert configuration,
    validation, Remove alert, and alert button display using current and target
    alert mileage values.
-6. Add alert accumulation logic so accepted ride deltas increment
+9. Add alert accumulation logic so accepted ride deltas increment
    `curAlertMileage`, alerts fire when the current value reaches or exceeds the
    target, and `curAlertMileage` then resets to `0`.
-7. Integrate Android notifications so alerts remain visible when kxgear is in
+10. Integrate Android notifications so alerts remain visible when kxgear is in
    the background and another app is active.
-8. Update unit and repository tests for Add Part, Replace Part, alert
+11. Update unit and repository tests for startup Karoo sync, `karooBikeId`
+   persistence, automatic imports, Add Part, Replace Part, alert
    persistence, validation, cur/target accumulation, reset behavior, and
    background alert behavior where testable.
 
