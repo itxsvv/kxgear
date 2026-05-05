@@ -80,7 +80,7 @@ fun BikeListScreen(
                     }
                 }
 
-                !state.isLoading -> {
+                else -> {
                     EmptyBikeList(modifier = Modifier.weight(1f))
                 }
             }
@@ -128,7 +128,7 @@ private fun EmptyBikeList(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = "No synchronized bikes found.",
+            text = "Add a bike in Karoo Settings",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
