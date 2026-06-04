@@ -30,6 +30,7 @@ fun PartDetailsScreen(
     onEditPart: (String) -> Unit,
     onRequestReplacePart: (String) -> Unit,
     onRequestArchivePart: (String) -> Unit,
+    onRestorePart: (String) -> Unit,
     onRequestDeletePart: (String) -> Unit,
     onDismissArchive: () -> Unit,
     onConfirmArchive: () -> Unit,
@@ -84,6 +85,7 @@ fun PartDetailsScreen(
                 emptyMessage = "No archived parts yet.",
                 canMutate = canMutate,
                 onEditPart = onEditPart,
+                onRestorePart = onRestorePart,
                 onDeletePart = onRequestDeletePart,
             )
         }

@@ -131,7 +131,7 @@ changes.
    installed and archived parts are shown for that bike.
 3. **Given** a local bike exists, **When** the user manages parts on that bike,
    **Then** installed and archived parts continue to support add, edit, archive,
-   delete, and replace actions.
+   restore, delete, and replace actions.
 4. **Given** the user creates a part from Add Part or Replace Part, **When**
    the change is saved, **Then** the new part stores the current creation time.
 5. **Given** the user opens Edit Part for an existing part, **When** the screen
@@ -315,7 +315,9 @@ mutating actions are disabled outside idle.
 - **FR-009c**: When a non-active bike is deleted, the system MUST keep the
   current active bike selection unchanged.
 - **FR-010**: The system MUST continue to support part add, edit, archive,
-  delete, and replacement flows on local bikes.
+  restore, delete, and replacement flows on local bikes.
+- **FR-010aa**: Restoring an archived part MUST move it back to installed state
+  without enforcing unique part names.
 - **FR-010a**: The system MUST allow multiple parts on the same bike to have
   the same part name.
 - **FR-010b**: Each part MUST persist a `createdDate` field.

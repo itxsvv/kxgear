@@ -112,6 +112,11 @@ class PartReplacementViewModelTest {
             partId: String,
         ): BikeDetails = details
 
+        override suspend fun restorePart(
+            bikeId: String,
+            partId: String,
+        ): BikeDetails = details
+
         override suspend fun replacePart(
             bikeId: String,
             oldPartId: String,

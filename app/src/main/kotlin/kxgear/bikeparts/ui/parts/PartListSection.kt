@@ -29,6 +29,7 @@ fun PartListSection(
     onEditPart: (String) -> Unit,
     onDeletePart: ((String) -> Unit)? = null,
     onArchivePart: ((String) -> Unit)? = null,
+    onRestorePart: ((String) -> Unit)? = null,
     onReplacePart: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -83,9 +84,19 @@ fun PartListSection(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             PartActionSlot(
-                                label = if (part.isArchived) null else "View",
-                                onClick = if (part.isArchived) null else ({ onEditPart(part.partId) }),
-                                enabled = true,
+                                label =
+                                    when {
+                                        part.isArchived && onRestorePart != null -> "Restore"
+                                        part.isArchived -> null
+                                        else -> "View"
+                                    },
+                                onClick =
+                                    when {
+                                        part.isArchived && onRestorePart != null -> ({ onRestorePart(part.partId) })
+                                        part.isArchived -> null
+                                        else -> ({ onEditPart(part.partId) })
+                                    },
+                                enabled = if (part.isArchived) canMutate else true,
                                 alignment = Alignment.CenterStart,
                                 modifier = Modifier.weight(1f),
                             )

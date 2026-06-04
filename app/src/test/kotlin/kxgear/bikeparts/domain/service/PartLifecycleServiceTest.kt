@@ -134,6 +134,28 @@ class PartLifecycleServiceTest {
     }
 
     @Test
+    fun restorePartMovesArchivedPartBackToInstalledWithoutNameChecks() = runBlocking {
+        val repository =
+            InMemoryBikeRepository(
+                bikeFile(
+                    parts =
+                        listOf(
+                            part(partId = "part-1", name = "Chain"),
+                            part(partId = "part-2", name = "Chain", status = PartStatus.ARCHIVED),
+                        ),
+                ),
+            )
+        val service = createService(repository)
+
+        val details = service.restorePart("bike-1", "part-2")
+
+        assertEquals(2, details.installedParts.size)
+        assertEquals(0, details.archivedParts.size)
+        assertEquals(listOf("Chain", "Chain"), details.installedParts.map { it.name })
+        assertEquals(PartStatus.INSTALLED, repository.requireBike("bike-1").parts.first { it.partId == "part-2" }.status)
+    }
+
+    @Test
     fun replacePartAllowsReusingArchivedPartName() = runBlocking {
         val repository =
             InMemoryBikeRepository(

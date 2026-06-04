@@ -126,6 +126,34 @@ class BikePartsService {
         return bikeFile.copy(parts = updatedParts, lastUpdatedAt = archivedAt)
     }
 
+    fun restorePart(
+        bikeFile: BikeFile,
+        partId: String,
+        restoredAt: Long,
+    ): BikeFile {
+        var found = false
+        val updatedParts = bikeFile.parts.map { part ->
+            if (part.partId == partId) {
+                found = true
+                if (part.status == PartStatus.INSTALLED) {
+                    part
+                } else {
+                    part.copy(
+                        status = PartStatus.INSTALLED,
+                        archivedAt = null,
+                        updatedAt = restoredAt,
+                    )
+                }
+            } else {
+                part
+            }
+        }
+        if (!found) {
+            throw RepositoryError.NotFound("Part not found: $partId")
+        }
+        return bikeFile.copy(parts = updatedParts, lastUpdatedAt = restoredAt)
+    }
+
     fun replacePart(
         bikeFile: BikeFile,
         oldPartId: String,

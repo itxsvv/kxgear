@@ -61,6 +61,11 @@ fun BikeDetailsRoute(
                     }
                 },
                 onRequestArchivePart = bikeDetailsViewModel::requestArchive,
+                onRestorePart = { partId ->
+                    scope.launch {
+                        bikeDetailsViewModel.restorePart(partId)
+                    }
+                },
                 onRequestDeletePart = bikeDetailsViewModel::requestDelete,
                 onDismissArchive = bikeDetailsViewModel::dismissArchive,
                 onConfirmArchive = {

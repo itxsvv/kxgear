@@ -40,6 +40,10 @@ class BikeDetailsViewModel(
         partDetailsViewModel.confirmDelete()
     }
 
+    suspend fun restorePart(partId: String) {
+        partDetailsViewModel.restorePart(partId)
+    }
+
     fun clearError() {
         partDetailsViewModel.clearError()
     }

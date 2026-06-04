@@ -46,6 +46,11 @@ interface PartLifecycleGateway {
         partId: String,
     ): BikeDetails
 
+    suspend fun restorePart(
+        bikeId: String,
+        partId: String,
+    ): BikeDetails
+
     suspend fun deletePart(
         bikeId: String,
         partId: String,
@@ -185,6 +190,30 @@ class PartLifecycleService(
                 )
         bikeRepository.saveBikeFile(updated)
         logger.debug("Deleted archived part $partId on bike $bikeId")
+        return updated.toBikeDetails()
+    }
+
+    override suspend fun restorePart(
+        bikeId: String,
+        partId: String,
+    ): BikeDetails {
+        val now = clock()
+        val bikeFile = loadRequiredBikeFile(bikeId)
+        val targetPart = bikeFile.parts.firstOrNull { it.partId == partId }
+            ?: throw RepositoryError.NotFound("Part not found: $partId")
+        if (targetPart.status != PartStatus.ARCHIVED) {
+            throw RepositoryError.Validation("Only archived parts can be restored")
+        }
+
+        val updated =
+            bikePartsService
+                .restorePart(
+                    bikeFile = bikeFile.withUpdatedBike(now),
+                    partId = partId,
+                    restoredAt = now,
+                ).copy(lastUpdatedAt = now)
+        bikeRepository.saveBikeFile(updated)
+        logger.debug("Restored archived part $partId on bike $bikeId")
         return updated.toBikeDetails()
     }
 

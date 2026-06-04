@@ -69,6 +69,26 @@ class PartDetailsViewModelTest {
     }
 
     @Test
+    fun restorePartMovesArchivedPartIntoInstalledList() = runBlocking {
+        val gateway =
+            FakePartLifecycleGateway(
+                details =
+                    bikeDetails(
+                        installedParts = listOf(part("part-1", "Chain")),
+                        archivedParts = listOf(part("part-2", "Chain", status = PartStatus.ARCHIVED)),
+                    ),
+            )
+        val viewModel = PartDetailsViewModel(gateway)
+
+        viewModel.loadBike("bike-1")
+        viewModel.restorePart("part-2")
+
+        assertEquals(2, viewModel.uiState.value.installedParts.size)
+        assertEquals(0, viewModel.uiState.value.archivedParts.size)
+        assertEquals(listOf("part-1", "part-2"), viewModel.uiState.value.installedParts.map { it.partId })
+    }
+
+    @Test
     fun submitCreateDefaultsBlankMileageToZero() = runBlocking {
         val gateway = FakePartLifecycleGateway(details = bikeDetails())
         val viewModel = PartFormViewModel(gateway)
@@ -326,6 +346,19 @@ class PartDetailsViewModelTest {
         ): BikeDetails {
             bikeDetails =
                 bikeDetails.copy(
+                    archivedParts = bikeDetails.archivedParts.filterNot { it.partId == partId },
+                )
+            return bikeDetails
+        }
+
+        override suspend fun restorePart(
+            bikeId: String,
+            partId: String,
+        ): BikeDetails {
+            val archived = bikeDetails.archivedParts.first { it.partId == partId }
+            bikeDetails =
+                bikeDetails.copy(
+                    installedParts = bikeDetails.installedParts + archived.copy(status = PartStatus.INSTALLED, archivedAt = null),
                     archivedParts = bikeDetails.archivedParts.filterNot { it.partId == partId },
                 )
             return bikeDetails

@@ -100,6 +100,13 @@ class PartDetailsViewModel(
             }.onFailure(::handleFailure)
     }
 
+    suspend fun restorePart(partId: String) {
+        val bikeId = _uiState.value.bikeId ?: return
+        runCatching { partLifecycleGateway.restorePart(bikeId, partId) }
+            .onSuccess(::applyDetails)
+            .onFailure(::handleFailure)
+    }
+
     fun clearError() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }
