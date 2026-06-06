@@ -9,6 +9,9 @@ import kxgear.bikeparts.domain.model.SharedMetadata
 import kxgear.bikeparts.domain.repository.BikeRepository
 import kxgear.bikeparts.domain.repository.MetadataRepository
 import kxgear.bikeparts.integration.logging.BikePartsLogger
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -88,6 +91,61 @@ class BikeLifecycleServiceTest {
         service.loadOverview(syncKarooOnStartup = true)
 
         assertEquals(null, bikeRepository.getBikeFile("bike-1")?.bike?.karooBikeId)
+    }
+
+    @Test
+    fun loadOverviewStartupSyncDoesNotDuplicateImportsWhenCalledConcurrently() = runBlocking {
+        val bikeRepository = InMemoryBikeRepository()
+        val metadataRepository = InMemoryMetadataRepository()
+        val karooGateway =
+            FakeKarooBikeCatalogGateway(
+                listOf(KarooBikeSnapshot("karoo-canyon", "Canyon", 2000)),
+                delayMs = 50L,
+            )
+        val service =
+            BikeLifecycleService(
+                bikeRepository = bikeRepository,
+                metadataRepository = metadataRepository,
+                logger = logger,
+                karooBikeCatalogGateway = karooGateway,
+                clock = { 3000L },
+                idProvider = { java.util.UUID.randomUUID().toString() },
+            )
+
+        awaitAll(
+            async { service.loadOverview(syncKarooOnStartup = true) },
+            async { service.loadOverview(syncKarooOnStartup = true) },
+        )
+
+        assertEquals(1, bikeRepository.listBikeFiles().count { it.bike.name == "Canyon" })
+    }
+
+    @Test
+    fun loadOverviewStartupSyncDeletesEmptyInactiveDuplicateForMatchedKarooBike() = runBlocking {
+        val bikeRepository =
+            InMemoryBikeRepository(
+                bikeFile("bike-1", "Canyon"),
+                bikeFile("bike-2", "Canyon", parts = emptyList()),
+            )
+        val metadataRepository = InMemoryMetadataRepository(SharedMetadata(activeBikeId = "bike-1"))
+        val karooGateway =
+            FakeKarooBikeCatalogGateway(
+                listOf(KarooBikeSnapshot("karoo-canyon", "Canyon", 2000)),
+            )
+        val service =
+            BikeLifecycleService(
+                bikeRepository = bikeRepository,
+                metadataRepository = metadataRepository,
+                logger = logger,
+                karooBikeCatalogGateway = karooGateway,
+                clock = { 3000L },
+            )
+
+        service.loadOverview(syncKarooOnStartup = true)
+
+        assertEquals(1, bikeRepository.listBikeFiles().count { it.bike.name == "Canyon" })
+        assertEquals(null, bikeRepository.getBikeFile("bike-2"))
+        assertEquals("karoo-canyon", bikeRepository.getBikeFile("bike-1")?.bike?.karooBikeId)
     }
 
     @Test
@@ -185,6 +243,17 @@ class BikeLifecycleServiceTest {
         bikeId: String,
         name: String,
         karooBikeId: String? = null,
+        parts: List<Part> =
+            listOf(
+                Part(
+                    partId = "part-1",
+                    name = "Chain",
+                    riddenMileage = 0,
+                    status = PartStatus.INSTALLED,
+                    createdAt = 1000L,
+                    updatedAt = 1000L,
+                ),
+            ),
     ): BikeFile =
         BikeFile(
             bike =
@@ -196,17 +265,7 @@ class BikeLifecycleServiceTest {
                     createdAt = 1000L,
                     updatedAt = 1000L,
                 ),
-            parts =
-                listOf(
-                    Part(
-                        partId = "part-1",
-                        name = "Chain",
-                        riddenMileage = 0,
-                        status = PartStatus.INSTALLED,
-                        createdAt = 1000L,
-                        updatedAt = 1000L,
-                    ),
-                ),
+            parts = parts,
             lastUpdatedAt = 1000L,
         )
 
@@ -244,12 +303,16 @@ class BikeLifecycleServiceTest {
 
     private class FakeKarooBikeCatalogGateway(
         private val bikes: List<KarooBikeSnapshot>,
+        private val delayMs: Long = 0L,
     ) : KarooBikeCatalogGateway {
         var loadCount: Int = 0
             private set
 
         override suspend fun listBikes(): List<KarooBikeSnapshot> {
             loadCount += 1
+            if (delayMs > 0) {
+                delay(delayMs)
+            }
             return bikes
         }
     }

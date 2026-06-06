@@ -10,6 +10,8 @@ import kxgear.bikeparts.domain.repository.MetadataRepository
 import kxgear.bikeparts.domain.validation.BikePartsValidators
 import kxgear.bikeparts.integration.logging.BikePartsLogger
 import java.util.UUID
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class BikeOverview(
     val bikes: List<BikeSummary>,
@@ -47,10 +49,14 @@ class BikeLifecycleService(
     private val clock: () -> Long = System::currentTimeMillis,
     private val idProvider: () -> String = { UUID.randomUUID().toString() },
 ) : BikeLifecycleGateway {
+    private val karooSyncMutex = Mutex()
+
     override suspend fun loadOverview(syncKarooOnStartup: Boolean): BikeOverview {
         val bikeFiles =
             if (syncKarooOnStartup) {
-                syncKarooBikes(bikeRepository.listBikeFiles())
+                karooSyncMutex.withLock {
+                    syncKarooBikes(bikeRepository.listBikeFiles())
+                }
             } else {
                 bikeRepository.listBikeFiles()
             }
@@ -255,14 +261,36 @@ class BikeLifecycleService(
             distinctKarooBikes.putIfAbsent(normalizeBikeName(bike.name), bike)
         }
 
-        val localByName = bikeFiles.associateBy { normalizeBikeName(it.bike.name) }.toMutableMap()
         val updatedBikeFiles = bikeFiles.toMutableList()
         val importedBikeIds = mutableListOf<String>()
         val currentMetadata = metadataRepository.read()
         val hadNoActiveBike = currentMetadata.activeBikeId == null
 
+        fun rebuildLocalByName(): Map<String, List<BikeFile>> =
+            updatedBikeFiles.groupBy { normalizeBikeName(it.bike.name) }
+
         distinctKarooBikes.values.forEach { karooBike ->
-            val matchedLocalBike = localByName[normalizeBikeName(karooBike.name)]
+            val normalizedName = normalizeBikeName(karooBike.name)
+            val localMatches = rebuildLocalByName()[normalizedName].orEmpty()
+            val matchedLocalBike =
+                localMatches
+                    .sortedWith(
+                        compareByDescending<BikeFile> { it.bike.bikeId == currentMetadata.activeBikeId }
+                            .thenByDescending { it.parts.isNotEmpty() }
+                            .thenByDescending { it.bike.karooBikeId == karooBike.karooBikeId }
+                            .thenBy { it.bike.createdAt },
+                    ).firstOrNull()
+            localMatches
+                .filter { candidate ->
+                    matchedLocalBike != null &&
+                        candidate.bike.bikeId != matchedLocalBike.bike.bikeId &&
+                        candidate.bike.bikeId != currentMetadata.activeBikeId &&
+                        candidate.parts.isEmpty()
+                }.forEach { duplicateBike ->
+                    bikeRepository.deleteBikeFile(duplicateBike.bike.bikeId)
+                    updatedBikeFiles.removeAll { it.bike.bikeId == duplicateBike.bike.bikeId }
+                    logger.debug("Deleted duplicate local bike ${duplicateBike.bike.bikeId} for Karoo bike ${karooBike.karooBikeId}")
+                }
             if (matchedLocalBike == null) {
                 val now = clock()
                 val newBikeFile =
@@ -281,7 +309,6 @@ class BikeLifecycleService(
                     )
                 bikeRepository.saveBikeFile(newBikeFile)
                 updatedBikeFiles += newBikeFile
-                localByName[normalizeBikeName(newBikeFile.bike.name)] = newBikeFile
                 importedBikeIds += newBikeFile.bike.bikeId
                 return@forEach
             }
@@ -304,7 +331,6 @@ class BikeLifecycleService(
             if (index >= 0) {
                 updatedBikeFiles[index] = updatedBikeFile
             }
-            localByName[normalizeBikeName(updatedBikeFile.bike.name)] = updatedBikeFile
         }
 
         updatedBikeFiles.toList().forEach { localBikeFile ->
@@ -331,7 +357,6 @@ class BikeLifecycleService(
             if (index >= 0) {
                 updatedBikeFiles[index] = clearedBikeFile
             }
-            localByName[normalizedName] = clearedBikeFile
         }
 
         if (hadNoActiveBike && importedBikeIds.isNotEmpty()) {
