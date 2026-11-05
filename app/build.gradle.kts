@@ -58,6 +58,9 @@ android {
         getByName("test").java.srcDirs("src/test/kotlin")
         getByName("androidTest").java.srcDirs("src/androidTest/kotlin")
     }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
 }
 
 dependencies {
@@ -70,6 +73,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.bundles.test)
+    testImplementation("com.github.nikosavola.karoo-ext-testing:karoo-ext-testing-robolectric:0.1.1")
+    testImplementation("org.robolectric:robolectric:4.17")
+    testImplementation("androidx.test:core:1.7.0")
 
     androidTestImplementation(libs.bundles.android.test)
     debugImplementation(libs.androidx.compose.ui.tooling)
